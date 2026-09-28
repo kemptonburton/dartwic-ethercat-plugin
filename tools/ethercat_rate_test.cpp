@@ -15,14 +15,19 @@ int main(int argc, char** argv) {
     std::string adapter;
     size_t cycles = 10000;
     int period_us = 1000;
+    int receive_timeout_us = 500;
+    bool scan_only = false;
     for (int i = 1; i < argc; ++i) {
         const std::string argument = argv[i];
         if (argument == "--bridge" && i + 1 < argc) bridge = argv[++i];
         else if (argument == "--adapter" && i + 1 < argc) adapter = argv[++i];
         else if (argument == "--cycles" && i + 1 < argc) cycles = std::stoull(argv[++i]);
         else if (argument == "--period-us" && i + 1 < argc) period_us = std::stoi(argv[++i]);
+        else if (argument == "--receive-timeout-us" && i + 1 < argc) receive_timeout_us = std::stoi(argv[++i]);
+        else if (argument == "--scan-only") scan_only = true;
         else {
-            std::cerr << "Usage: ethercat_rate_test --bridge PATH --adapter ID [--cycles N] [--period-us 1000]\n";
+            std::cerr << "Usage: ethercat_rate_test --bridge PATH --adapter ID [--cycles N] "
+                         "[--period-us 1000] [--receive-timeout-us 500] [--scan-only]\n";
             return 2;
         }
     }
@@ -33,8 +38,13 @@ int main(int argc, char** argv) {
 
     try {
         EtherCAT::BridgeLibrary library(bridge);
-        EtherCAT::BridgeLibrary::Master master(library, {{"adapter", adapter}});
+        EtherCAT::BridgeLibrary::Master master(library,
+            {{"adapter", adapter}, {"receive_timeout_us", receive_timeout_us}});
         const auto topology = master.scan();
+        if (scan_only) {
+            std::cout << topology.dump(2) << '\n';
+            return 0;
+        }
         master.start();
         std::vector<uint8_t> outputs(master.outputSize(), 0);
         std::vector<uint8_t> inputs(master.inputSize(), 0);

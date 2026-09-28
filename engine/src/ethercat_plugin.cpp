@@ -1,6 +1,7 @@
 #include "ethercat_plugin.h"
 
 #include "ethercat_codec.h"
+#include "ethercat_discovery.h"
 #include "ethercat_module.h"
 
 #include <algorithm>
@@ -15,8 +16,14 @@ namespace {
 using DARTWIC::API::ChannelField;
 using DARTWIC::API::ChannelStorage;
 
+constexpr const char* ethercat_icon =
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E"
+    "%3Cpath fill='%23e63032' d='M2 4h13V1l7 5.5-7 5.5V9H2z'/%3E"
+    "%3Cpath fill='%23e63032' d='M22 15H9v-3l-7 5.5L9 23v-3h13z'/%3E%3C/svg%3E";
+
 struct Mapping {
     std::string channel;
+    std::string readback_channel;
     bool channel_to_device = false;
     size_t bit_offset = 0;
     size_t bit_length = 0;
@@ -33,9 +40,11 @@ struct CycleContext {
     std::vector<Mapping> outputs;
     std::vector<Mapping> inputs;
     DARTWIC::API::FixedChannelBatch output_channels;
+    DARTWIC::API::FixedChannelBatch output_readback_channels;
     DARTWIC::API::FixedChannelBatch input_channels;
     DARTWIC::API::FixedChannelBatch diagnostic_channels;
     std::vector<double> output_values;
+    std::vector<double> output_readback_values;
     std::vector<double> input_values;
     std::vector<double> diagnostic_values;
     std::vector<uint8_t> output_image;
@@ -52,6 +61,13 @@ void createFixedChannel(DARTWIC::API::SDK_API* api, const std::string& channel, 
     api->upsertChannelField(channel, ChannelField::VALUE, initial, ChannelStorage::Fixed);
 }
 
+void createObservedChannel(DARTWIC::API::SDK_API* api,
+    const std::string& channel,
+    double initial = 0.0) {
+    createFixedChannel(api, channel, initial);
+    api->setChannel(channel, DARTWIC::API::ChannelValue{initial});
+}
+
 std::vector<Mapping> parseMappings(const nlohmann::json& arguments) {
     if (!arguments.contains("mappings") || !arguments.at("mappings").is_array()) return {};
     std::vector<Mapping> mappings;
@@ -65,6 +81,15 @@ std::vector<Mapping> parseMappings(const nlohmann::json& arguments) {
             throw std::invalid_argument("EtherCAT mapping direction must be channel_to_device or device_to_channel.");
         }
         if (mapping.channel.empty()) throw std::invalid_argument("Every EtherCAT mapping requires a channel.");
+        if (mapping.channel_to_device) {
+            mapping.readback_channel = value.value("readback_channel", mapping.channel + "_state");
+            if (mapping.readback_channel.empty()) {
+                throw std::invalid_argument("Every EtherCAT output mapping requires a readback channel.");
+            }
+            if (mapping.readback_channel == mapping.channel) {
+                throw std::invalid_argument("An EtherCAT output command and its readback must use different channels.");
+            }
+        }
         mapping.bit_offset = value.value("bit_offset", size_t{0});
         mapping.bit_length = value.value("bit_length", size_t{0});
         mapping.type = parseValueType(value.value("data_type", std::string{"uint16"}));
@@ -110,14 +135,23 @@ void configureCycle(DARTWIC::API::SDK_API* api, DARTWIC::API::TaskRuntime& runti
 
     std::vector<std::string> fixed_inputs;
     for (const auto& mapping : mappings) {
-        createFixedChannel(module->dartwic, mapping.channel);
-        if (mapping.channel_to_device) fixed_inputs.push_back(mapping.channel);
+        if (mapping.channel_to_device) {
+            createFixedChannel(module->dartwic, mapping.channel);
+            createObservedChannel(module->dartwic, mapping.readback_channel);
+            fixed_inputs.push_back(mapping.channel);
+        } else {
+            createObservedChannel(module->dartwic, mapping.channel);
+        }
     }
     runtime.setFixedInputChannels(std::move(fixed_inputs));
-    createFixedChannel(module->dartwic, diagnosticChannel(runtime.getTaskName(), "exchange_time_us"));
-    createFixedChannel(module->dartwic, diagnosticChannel(runtime.getTaskName(), "actual_wkc"));
-    createFixedChannel(module->dartwic, diagnosticChannel(runtime.getTaskName(), "expected_wkc"));
-    createFixedChannel(module->dartwic, diagnosticChannel(runtime.getTaskName(), "failure_count"));
+    createObservedChannel(module->dartwic,
+        diagnosticChannel(runtime.getTaskName(), "exchange_time_us"));
+    createObservedChannel(module->dartwic,
+        diagnosticChannel(runtime.getTaskName(), "actual_wkc"));
+    createObservedChannel(module->dartwic,
+        diagnosticChannel(runtime.getTaskName(), "expected_wkc"));
+    createObservedChannel(module->dartwic,
+        diagnosticChannel(runtime.getTaskName(), "failure_count"));
 }
 
 std::shared_ptr<CycleContext> startCycle(DARTWIC::API::SDK_API* api,
@@ -134,31 +168,41 @@ std::shared_ptr<CycleContext> startCycle(DARTWIC::API::SDK_API* api,
             "Configure at least one EtherCAT PDO mapping before starting this task.");
     }
 
-    context->module->start(context->task_name);
-    try {
-        context->output_image.resize(context->module->outputSize());
-        context->input_image.resize(context->module->inputSize());
-        validateMappings(*context);
-
-        std::vector<std::string> output_names;
-        std::vector<std::string> input_names;
-        for (const auto& mapping : context->outputs) output_names.push_back(mapping.channel);
-        for (const auto& mapping : context->inputs) input_names.push_back(mapping.channel);
-        context->output_channels = context->module->dartwic->resolveFixedChannels(output_names);
-        context->input_channels = context->module->dartwic->resolveFixedChannels(input_names);
-        context->diagnostic_channels = context->module->dartwic->resolveFixedChannels({
-            diagnosticChannel(context->task_name, "exchange_time_us"),
-            diagnosticChannel(context->task_name, "actual_wkc"),
-            diagnosticChannel(context->task_name, "expected_wkc"),
-            diagnosticChannel(context->task_name, "failure_count"),
-        });
-        context->output_values.resize(context->outputs.size());
-        context->input_values.resize(context->inputs.size());
-        context->diagnostic_values.resize(4);
-    } catch (...) {
-        context->module->stop(context->task_name);
-        throw;
+    std::vector<std::string> output_names;
+    std::vector<std::string> output_readback_names;
+    std::vector<std::string> input_names;
+    for (const auto& mapping : context->outputs) {
+        output_names.push_back(mapping.channel);
+        output_readback_names.push_back(mapping.readback_channel);
     }
+    for (const auto& mapping : context->inputs) input_names.push_back(mapping.channel);
+    context->output_channels = context->module->dartwic->resolveFixedChannels(output_names);
+    context->output_readback_channels = context->module->dartwic->resolveFixedChannels(output_readback_names);
+    context->input_channels = context->module->dartwic->resolveFixedChannels(input_names);
+    context->diagnostic_channels = context->module->dartwic->resolveFixedChannels({
+        diagnosticChannel(context->task_name, "exchange_time_us"),
+        diagnosticChannel(context->task_name, "actual_wkc"),
+        diagnosticChannel(context->task_name, "expected_wkc"),
+        diagnosticChannel(context->task_name, "failure_count"),
+    });
+    // CAESAR releases task-owned channel authority when a task stops. Restore
+    // observe-only ownership on every start, including starts without a new
+    // configuration pass. Resolve first so missing channels fail without being
+    // recreated accidentally as dynamic storage by setChannel.
+    for (const auto& mapping : context->outputs) {
+        api->setChannel(mapping.readback_channel);
+    }
+    for (const auto& mapping : context->inputs) {
+        api->setChannel(mapping.channel);
+    }
+    for (const auto* suffix : {"exchange_time_us", "actual_wkc", "expected_wkc", "failure_count"}) {
+        api->setChannel(diagnosticChannel(context->task_name, suffix));
+    }
+    context->output_values.resize(context->outputs.size());
+    context->output_readback_values.resize(context->outputs.size());
+    context->input_values.resize(context->inputs.size());
+    context->diagnostic_values.resize(4);
+    context->module->start(context->task_name);
     return context;
 }
 
@@ -167,11 +211,33 @@ uint64_t unixNanoseconds() {
         std::chrono::system_clock::now().time_since_epoch()).count());
 }
 
+void publishFailureDiagnostics(CycleContext& context) noexcept {
+    if (context.diagnostic_values.size() < 4) return;
+    context.diagnostic_values[0] = 0.0;
+    context.diagnostic_values[1] = 0.0;
+    context.diagnostic_values[2] = 0.0;
+    context.diagnostic_values[3] = static_cast<double>(context.consecutive_failures);
+    try {
+        context.module->dartwic->upsertFixedChannelValues(
+            context.diagnostic_channels, context.diagnostic_values, unixNanoseconds());
+    } catch (...) {
+        // Diagnostics must never stop the reconnect loop.
+    }
+}
+
 void runCycle(DARTWIC::API::TaskRuntime& runtime) {
     const auto context = runtime.getTypedRuntimeContext<CycleContext>("ethercat.cycle");
     if (!context || !context->module || context->module->dartwic == nullptr) return;
     auto* api = context->module->dartwic;
+    if (!context->module->isOwnedBy(context->task_name) || !context->module->isConnected()) return;
     try {
+        const auto output_size = context->module->outputSize();
+        const auto input_size = context->module->inputSize();
+        if (context->output_image.size() != output_size || context->input_image.size() != input_size) {
+            context->output_image.assign(output_size, uint8_t{0});
+            context->input_image.assign(input_size, uint8_t{0});
+            validateMappings(*context);
+        }
         if (!context->output_channels.empty()) {
             api->queryFixedChannelValues(context->output_channels, context->output_values, 0.0);
             for (size_t i = 0; i < context->outputs.size(); ++i) {
@@ -183,6 +249,15 @@ void runCycle(DARTWIC::API::TaskRuntime& runtime) {
 
         const auto status = context->module->exchange(context->output_image, context->input_image);
         const auto timestamp = unixNanoseconds();
+        for (size_t i = 0; i < context->outputs.size(); ++i) {
+            const auto& mapping = context->outputs[i];
+            context->output_readback_values[i] = decodeValue(context->output_image, mapping.bit_offset,
+                mapping.bit_length, mapping.type, mapping.scale, mapping.offset);
+        }
+        if (!context->output_readback_channels.empty()) {
+            api->upsertFixedChannelValues(
+                context->output_readback_channels, context->output_readback_values, timestamp);
+        }
         for (size_t i = 0; i < context->inputs.size(); ++i) {
             const auto& mapping = context->inputs[i];
             context->input_values[i] = decodeValue(context->input_image, mapping.bit_offset,
@@ -199,17 +274,21 @@ void runCycle(DARTWIC::API::TaskRuntime& runtime) {
             0.0,
         };
         api->upsertFixedChannelValues(context->diagnostic_channels, context->diagnostic_values, timestamp);
+    } catch (const std::exception& error) {
+        static_cast<void>(error);
+        ++context->consecutive_failures;
+        publishFailureDiagnostics(*context);
     } catch (...) {
         ++context->consecutive_failures;
-        context->diagnostic_values[3] = static_cast<double>(context->consecutive_failures);
-        api->upsertFixedChannelValues(context->diagnostic_channels, context->diagnostic_values, unixNanoseconds());
-        if (context->consecutive_failures >= 3) throw;
+        publishFailureDiagnostics(*context);
     }
 }
 
 void stopCycle(DARTWIC::API::TaskRuntime& runtime) noexcept {
     const auto context = runtime.getTypedRuntimeContext<CycleContext>("ethercat.cycle");
-    if (context && context->module) context->module->stop(context->task_name);
+    if (context && context->module) {
+        context->module->stop(context->task_name);
+    }
     runtime.removeRuntimeContext("ethercat.cycle");
 }
 } // namespace
@@ -218,6 +297,26 @@ void EthercatPlugin::onPluginLoaded() {
     dartwic->registerModuleType({
         .id = "master",
         .name = "EtherCAT Master",
+    });
+
+    auto device_finder = createEthercatDeviceFinder(dartwic, config);
+    dartwic->registerOperation("get_discovery_settings", "Get EtherCAT Discovery Settings",
+        [device_finder](const nlohmann::json&) { return device_finder->settings(); });
+    dartwic->registerOperation("scan_devices", "Scan for EtherCAT Devices",
+        [device_finder](const nlohmann::json&) { return device_finder->scanNow(); });
+    dartwic->registerLoop("device_discovery", "EtherCAT Device Discovery", {
+        .on_loop = [device_finder]() { device_finder->tick(); },
+        .target_frequency_hz = 2.0,
+    });
+    dartwic->registerLoop("connection_monitor", "EtherCAT Connection Monitor", {
+        .on_loop = [this]() {
+            for (const auto& summary : dartwic->getModuleInstances("ethercat")) {
+                const auto module = std::dynamic_pointer_cast<EthercatModule>(
+                    dartwic->getModuleInstance(summary.name));
+                if (module) module->monitorConnection();
+            }
+        },
+        .target_frequency_hz = 1.0,
     });
 
     dartwic->registerOperation("adapters", "List EtherCAT adapters", [](const nlohmann::json&) {
@@ -232,6 +331,7 @@ void EthercatPlugin::onPluginLoaded() {
 
     DARTWIC::API::TaskTypeDefinition task;
     task.metadata.structure = DARTWIC::API::TaskStructure::Periodic;
+    task.metadata.icon_url = ethercat_icon;
     task.metadata.default_arguments = {
         {"module_instance_name", ""},
         {"mappings", nlohmann::json::array()},
@@ -255,8 +355,6 @@ DARTWIC::Modules::BaseModule* EthercatPlugin::createModule(const std::string& mo
     return new EthercatModule(std::move(config), api);
 }
 } // namespace EtherCAT
-
-DARTWIC_PLUGIN_DECLARE_SDK_ABI()
 
 DARTWIC_PLUGIN_EXPORT DARTWIC::Plugins::BasePlugin* createPlugin(
     nlohmann::json config,

@@ -29,6 +29,15 @@ One `ethercat.cycle` task exclusively owns one `ethercat.master` module while ru
 
 ## Configuration
 
+The engine automatically scans every Npcap-visible adapter that is not already assigned to an EtherCAT Master module. When a slave chain responds, DARTWIC opens the standard device-found notification with:
+
+- one suggested EtherCAT Master module for the adapter;
+- the discovered slave identity and process-image topology;
+- one suggested RAPID channel for every discovered input/output PDO entry; and
+- an optional EtherCAT Cyclic I/O task containing the generated PDO mappings.
+
+Discovery runs asynchronously, so an unavailable adapter cannot block engine or Settings startup. Its defaults are stored in `plugin.json` under `device_discovery`. After a bus has been added, that adapter is excluded from discovery so the scanner cannot contend with its configured master.
+
 1. Create an **EtherCAT Master** module.
 2. Select the dedicated physical EtherCAT adapter from the dropdown.
 3. Create an **EtherCAT Cyclic I/O** periodic task and set its period to `1 ms` for 1 kHz operation.

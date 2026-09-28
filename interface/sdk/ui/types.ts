@@ -286,3 +286,70 @@ export interface ModuleInstanceSelectProps extends HostComponentProps {
     /** Shows loading, incompatibility, and empty-state diagnostics. */
     showStatus?: boolean;
 }
+
+/** Shared module selector, module link, and opt-in live connection status. @dartwic-reference @category DARTWIC UI Components */
+export interface ModuleInstanceConnectionProps extends ModuleInstanceSelectProps {
+    description?: string;
+    showSelector?: boolean;
+    showConnectionStatus?: boolean;
+    statusText?: boolean;
+    compact?: boolean;
+}
+
+/** One editable row in the standard task channel-binding table. @dartwic-reference @category DARTWIC UI Components */
+export interface TaskBinding {
+    id?: string;
+    [name: string]: unknown;
+}
+
+/** Standard task binding table shared by plugin task editors. @dartwic-reference @category DARTWIC UI Components */
+export interface TaskBindingTableProps extends HostComponentProps {
+    title?: string;
+    bindings: TaskBinding[];
+    onBindingsChange: (bindings: TaskBinding[]) => void;
+    bindingTypes: Array<{value: string; label: string}>;
+    channelMode?: "read" | "write";
+    emptyMessage?: string;
+    addLabel?: string;
+    addDisabled?: boolean;
+    createBinding?: (sequence: number) => TaskBinding;
+    columns?: Array<{
+        key?: string;
+        label: HostNode;
+        width?: string;
+        render: (binding: TaskBinding, index: number, updateBinding: (binding: TaskBinding) => void) => HostNode;
+    }>;
+    headerActions?: HostNode;
+    minTableWidth?: string;
+}
+
+/** One live channel rendered beneath a linked module task. @dartwic-reference @category DARTWIC UI Components */
+export interface ModuleRuntimeChannel {
+    name: string;
+    label?: string;
+    direction?: "input" | "output" | "diagnostic";
+    detail?: string;
+}
+
+/** Props for the shared opt-in module connection indicator. @dartwic-reference @category DARTWIC UI Components */
+export interface ModuleConnectionStatusProps extends HostComponentProps {
+    presentation: {
+        channel: string;
+        label?: string;
+        endpoint?: string;
+        connectedValue?: string | number | boolean;
+    };
+    showText?: boolean;
+    compact?: boolean;
+}
+
+/** Props for the standard linked-task, status, and channel overview on module pages. @dartwic-reference @category DARTWIC UI Components */
+export interface ModuleRuntimeOverviewProps extends HostComponentProps {
+    instanceName: string;
+    connectionChannel?: string;
+    connectionLabel?: string;
+    endpoint?: string;
+    taskTypeIds?: string[];
+    resolveTaskChannels?: (task: any) => ModuleRuntimeChannel[];
+    emptyMessage?: string;
+}

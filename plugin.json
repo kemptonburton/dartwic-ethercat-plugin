@@ -4,8 +4,16 @@
   "description": "High-speed cyclic EtherCAT I/O for DARTWIC using a KickCAT C bridge.",
   "author": "Voit Systems",
   "version": "0.1.0",
-  "minEngineVersion": "2.0.0-beta.1",
-  "minInterfaceVersion": "1.0.0-pre_release",
+  "minEngineVersion": "2.0.0-beta.3",
+  "minInterfaceVersion": "2.0.0-beta.3",
   "contains_engine_plugin": true,
-  "contains_interface_plugin": true
+  "contains_interface_plugin": true,
+  "device_discovery": {
+    "enabled": true,
+    "scan_interval_seconds": 5,
+    "receive_timeout_us": 100000,
+    "cycle_receive_timeout_us": 100000,
+    "create_cycle_task": true,
+    "maximum_suggested_channels": 512
+  }
 }

@@ -1,4 +1,4 @@
 {
   "adapter": "",
-  "receive_timeout_us": 500
+  "receive_timeout_us": 100000
 }

@@ -32,6 +32,7 @@ set(ENGINE_PLUGIN_DIR "${PROJECT_SOURCE_DIR}/plugin/${ENGINE_PLUGIN_VARIANT}/${E
 set(ETHERCAT_ENGINE_SOURCES
     "${ENGINE_DIR}/src/ethercat_bridge_loader.cpp"
     "${ENGINE_DIR}/src/ethercat_codec.cpp"
+    "${ENGINE_DIR}/src/ethercat_discovery.cpp"
     "${ENGINE_DIR}/src/ethercat_module.cpp"
     "${ENGINE_DIR}/src/ethercat_plugin.cpp")
 add_library(dartwic_ethercat_plugin_engine SHARED ${ETHERCAT_ENGINE_SOURCES})

@@ -38,6 +38,15 @@ struct PcapApi {
     PcapApi()
         : library(LoadLibraryW(L"wpcap.dll")) {
         if (library == nullptr) {
+            wchar_t system_directory[MAX_PATH]{};
+            const auto length = GetSystemDirectoryW(system_directory, MAX_PATH);
+            if (length > 0 && length < MAX_PATH) {
+                const std::wstring npcap_path = std::wstring(system_directory, length) +
+                    L"\\Npcap\\wpcap.dll";
+                library = LoadLibraryW(npcap_path.c_str());
+            }
+        }
+        if (library == nullptr) {
             throw std::runtime_error(
                 "Npcap is required for physical EtherCAT adapters. Install Npcap and restart DARTWIC.");
         }
@@ -98,14 +107,7 @@ void Socket::open(std::string const& interface) {
         -1, nullptr, error_.data());
     if (fd_ == nullptr) throw std::runtime_error(error_.data());
 
-    auto macToString = [](MAC const& mac) {
-        char buffer[18];
-        snprintf(buffer, sizeof(buffer), "%02x:%02x:%02x:%02x:%02x:%02x",
-            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        return std::string(buffer);
-    };
-    const auto filter = "ether host " + macToString(PRIMARY_IF_MAC) +
-        " or ether host " + macToString(SECONDARY_IF_MAC);
+    const std::string filter = "ether proto 0x88a4";
     bpf_program program{};
     if (api.compile(static_cast<pcap_t*>(fd_), &program, filter.c_str(), 0,
             PCAP_NETMASK_UNKNOWN) == -1) {

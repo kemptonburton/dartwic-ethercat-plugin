@@ -25,6 +25,15 @@ FetchContent_Declare(kickcat
     GIT_SHALLOW FALSE)
 FetchContent_MakeAvailable(kickcat)
 if(WIN32)
+    # KickCAT 2.6-rc3 stores caller-provided source MACs but still uses its
+    # placeholder constants in two transmit paths. Patch the pinned source so
+    # Windows/Npcap frames carry the selected adapter's real MAC address.
+    set(KICKCAT_LINK_SOURCE "${kickcat_SOURCE_DIR}/lib/master/src/Link.cc")
+    file(READ "${KICKCAT_LINK_SOURCE}" KICKCAT_LINK_CONTENT)
+    string(REPLACE "PRIMARY_IF_MAC" "src_nominal_" KICKCAT_LINK_CONTENT "${KICKCAT_LINK_CONTENT}")
+    string(REPLACE "SECONDARY_IF_MAC" "src_redundancy_" KICKCAT_LINK_CONTENT "${KICKCAT_LINK_CONTENT}")
+    file(WRITE "${KICKCAT_LINK_SOURCE}" "${KICKCAT_LINK_CONTENT}")
+
     # Replace KickCAT's directly linked Windows socket translation unit with a
     # lazy-loading equivalent. This lets the plugin load and report a useful
     # adapter error when Npcap is missing instead of failing DLL discovery.
@@ -42,6 +51,9 @@ set_target_properties(kickcat PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(dartwic_ethercat_bridge SHARED src/dartwic_ethercat_bridge.cpp)
 target_include_directories(dartwic_ethercat_bridge PRIVATE ../engine/include)
 target_link_libraries(dartwic_ethercat_bridge PRIVATE kickcat nlohmann_json::nlohmann_json)
+if(WIN32)
+    target_link_libraries(dartwic_ethercat_bridge PRIVATE iphlpapi)
+endif()
 target_compile_definitions(dartwic_ethercat_bridge PRIVATE DW_EC_BRIDGE_BUILD=1)
 
 set_target_properties(dartwic_ethercat_bridge PROPERTIES

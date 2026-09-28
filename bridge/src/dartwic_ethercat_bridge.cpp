@@ -1,13 +1,28 @@
 #include "dartwic_ethercat_bridge.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
+#include <cctype>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <ws2ipdef.h>
+#include <iphlpapi.h>
+#include <netioapi.h>
+#ifdef interface
+#undef interface
+#endif
+#endif
 
 #include <nlohmann/json.hpp>
 
@@ -39,6 +54,62 @@ struct dw_ec_context {
 
 namespace {
 using nlohmann::json;
+
+#ifdef _WIN32
+struct WindowsAdapterInfo {
+    std::array<uint8_t, 6> mac{};
+    bool ethernet = false;
+    bool hardware = false;
+    bool up = false;
+};
+
+std::optional<WindowsAdapterInfo> windowsAdapterInfo(const std::string& pcap_name) {
+    const auto open = pcap_name.find('{');
+    const auto close = open == std::string::npos ? std::string::npos : pcap_name.find('}', open);
+    if (open == std::string::npos || close == std::string::npos) return std::nullopt;
+
+    auto normalize = [](std::string value) {
+        value.erase(std::remove(value.begin(), value.end(), '{'), value.end());
+        value.erase(std::remove(value.begin(), value.end(), '}'), value.end());
+        std::transform(value.begin(), value.end(), value.begin(),
+            [](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+        return value;
+    };
+    const auto requested = normalize(pcap_name.substr(open, close - open + 1));
+
+    ULONG size = 0;
+    auto result = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_ALL_INTERFACES,
+        nullptr, nullptr, &size);
+    if (result != ERROR_BUFFER_OVERFLOW || size == 0) return std::nullopt;
+
+    std::vector<uint8_t> storage(size);
+    auto* adapters = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(storage.data());
+    result = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_ALL_INTERFACES,
+        nullptr, adapters, &size);
+    if (result != NO_ERROR) return std::nullopt;
+
+    for (auto* adapter = adapters; adapter != nullptr; adapter = adapter->Next) {
+        if (adapter->AdapterName == nullptr || adapter->PhysicalAddressLength < 6) continue;
+        if (normalize(adapter->AdapterName) != requested) continue;
+        WindowsAdapterInfo info;
+        std::copy_n(adapter->PhysicalAddress, info.mac.size(), info.mac.begin());
+        info.ethernet = adapter->IfType == IF_TYPE_ETHERNET_CSMACD;
+        info.up = adapter->OperStatus == IfOperStatusUp;
+        MIB_IF_ROW2 row{};
+        row.InterfaceLuid = adapter->Luid;
+        info.hardware = GetIfEntry2(&row) == NO_ERROR &&
+            row.InterfaceAndOperStatusFlags.HardwareInterface;
+        return info;
+    }
+    return std::nullopt;
+}
+
+std::optional<std::array<uint8_t, 6>> adapterMac(const std::string& pcap_name) {
+    const auto info = windowsAdapterInfo(pcap_name);
+    if (!info) return std::nullopt;
+    return info->mac;
+}
+#endif
 
 dw_ec_result guard(dw_ec_context* context, const std::function<void()>& action) {
     try {
@@ -119,8 +190,11 @@ void buildTopology(dw_ec_context& context) {
     for (const auto& slave : context.bus->slaves()) {
         context.input_size += static_cast<size_t>(std::max(slave.input.bsize, 0));
         context.output_size += static_cast<size_t>(std::max(slave.output.bsize, 0));
+        // The cyclic exchange uses one logical write and one logical read.
+        // Each participating FMMU contributes one working-counter increment
+        // to its direction.
         if (slave.input.bsize > 0) context.expected_wkc += 1;
-        if (slave.output.bsize > 0) context.expected_wkc += 2;
+        if (slave.output.bsize > 0) context.expected_wkc += 1;
     }
     for (size_t position = 0; position < context.bus->slaves().size(); ++position) {
         const auto& slave = context.bus->slaves()[position];
@@ -147,6 +221,101 @@ void buildTopology(dw_ec_context& context) {
     };
 }
 
+uint32_t processLogicalData(dw_ec_context& context,
+    const std::function<void(kickcat::DatagramState const&)>& error) {
+    // createMapping() programmed each slave's FMMUs and attached its PDOs to
+    // iomap. Use the standard logical cyclic exchange so the same process
+    // image reaches both real slaves and software simulators.
+    using namespace kickcat;
+    uint32_t actual_wkc = 0;
+    std::string failure;
+
+    auto queue_mapping = [&](Slave::PIMapping& mapping, Command command,
+                             bool read, const char* direction) {
+        if (mapping.bsize <= 0 || mapping.data == nullptr) return;
+        const auto address = mapping.address;
+        const auto length = static_cast<uint16_t>(mapping.bsize);
+        auto process = [destination = mapping.data, length, address, read,
+                        direction, &actual_wkc, &failure](
+                           DatagramHeader const*, uint8_t const* data, uint16_t wkc) {
+            actual_wkc += wkc;
+            if (wkc != 1) {
+                if (failure.empty()) {
+                    failure = std::string{"logical "} + direction +
+                        " at 0x" + [&]() {
+                            char text[9]{};
+                            std::snprintf(text, sizeof(text), "%08x", address);
+                            return std::string{text};
+                        }() + " expected WKC 1, received " + std::to_string(wkc);
+                }
+                return DatagramState::INVALID_WKC;
+            }
+            if (read) std::memcpy(destination, data, length);
+            return DatagramState::OK;
+        };
+        context.link->addDatagram(command, address,
+            read ? nullptr : mapping.data, length, process, error);
+    };
+
+    for (auto& slave : context.bus->slaves()) {
+        queue_mapping(slave.output, Command::LWR, false, "write");
+    }
+    context.link->processDatagrams();
+    if (!failure.empty()) throw std::runtime_error("KickCAT " + failure + ".");
+
+    for (auto& slave : context.bus->slaves()) {
+        queue_mapping(slave.input, Command::LRD, true, "read");
+    }
+    context.link->processDatagrams();
+    if (!failure.empty()) throw std::runtime_error("KickCAT " + failure + ".");
+    return actual_wkc;
+}
+
+void readBackFmmuMappings(dw_ec_context& context) {
+    using namespace kickcat;
+    for (auto& slave : context.bus->slaves()) {
+        const auto count = static_cast<size_t>(slave.esc.fmmus);
+        if (count == 0) continue;
+        std::vector<fmmu::Register> registers(count);
+        std::optional<DatagramState> failure;
+        for (size_t index = 0; index < count; ++index) {
+            auto process = [&, index](DatagramHeader const*, uint8_t const* data, uint16_t wkc) {
+                if (wkc != 1) return DatagramState::INVALID_WKC;
+                std::memcpy(&registers[index], data, sizeof(fmmu::Register));
+                return DatagramState::OK;
+            };
+            context.link->addDatagram(Command::FPRD,
+                createAddress(slave.address,
+                    static_cast<uint16_t>(reg::FMMU + index * sizeof(fmmu::Register))),
+                nullptr, sizeof(fmmu::Register), process,
+                [&](DatagramState const& state) {
+                    if (!failure.has_value()) failure = state;
+                });
+        }
+        context.link->processDatagrams();
+        if (failure.has_value()) {
+            throw std::runtime_error(
+                std::string{"Unable to read back EtherCAT FMMU configuration: "} +
+                toString(*failure));
+        }
+
+        auto apply = [&](Slave::PIMapping& mapping, uint8_t type) {
+            if (mapping.bsize <= 0 || mapping.sync_manager < 0 ||
+                static_cast<size_t>(mapping.sync_manager) >= slave.sii.syncManagers.size()) return;
+            const auto physical = slave.sii.syncManagers[static_cast<size_t>(mapping.sync_manager)].start_address;
+            const auto found = std::find_if(registers.begin(), registers.end(),
+                [&](const fmmu::Register& entry) {
+                    return entry.activate != 0 && entry.type == type &&
+                        entry.physical_address == physical &&
+                        entry.length >= static_cast<uint16_t>(mapping.bsize);
+                });
+            if (found != registers.end()) mapping.address = found->logical_address;
+        };
+        apply(slave.input, 1);
+        apply(slave.output, 2);
+    }
+}
+
 void scanBus(dw_ec_context& context) {
     using namespace kickcat;
     const auto adapter = context.config.value("adapter", std::string{});
@@ -155,13 +324,26 @@ void scanBus(dw_ec_context& context) {
     context.nominal_socket = std::get<0>(sockets);
     context.redundant_socket = std::get<1>(sockets);
 
+#ifdef _WIN32
+    const auto source_mac = adapterMac(adapter).value_or(
+        std::array<uint8_t, 6>{PRIMARY_IF_MAC[0], PRIMARY_IF_MAC[1], PRIMARY_IF_MAC[2],
+            PRIMARY_IF_MAC[3], PRIMARY_IF_MAC[4], PRIMARY_IF_MAC[5]});
+    context.link = std::make_shared<Link>(context.nominal_socket, context.redundant_socket,
+        []() {}, source_mac.data(), SECONDARY_IF_MAC);
+#else
     context.link = std::make_shared<Link>(context.nominal_socket, context.redundant_socket, []() {});
+#endif
     context.link->setTimeout(std::chrono::microseconds(
         std::max(context.config.value("receive_timeout_us", 500), 50)));
     context.bus = std::make_unique<Bus>(context.link);
     context.bus->init(100ms);
     context.iomap.assign(65536, 0);
     context.bus->createMapping(context.iomap.data(), context.iomap.size());
+    // Read back what the slave actually accepted. Physical hardware normally
+    // echoes the mapping just programmed above. Software or fixed-configuration
+    // slaves may retain an imported mapping, which is still valid and must be
+    // used for cyclic logical datagrams.
+    readBackFmmuMappings(context);
     context.bus->requestState(State::SAFE_OP);
     context.bus->waitForState(State::SAFE_OP, 500ms);
     buildTopology(context);
@@ -179,7 +361,21 @@ dw_ec_result DW_EC_BRIDGE_CALL dw_ec_list_adapters_json(char* destination,
         json adapters = json::array();
         try {
             for (const auto& adapter : kickcat::listInterfaces()) {
-                adapters.push_back({{"id", adapter.name}, {"name", adapter.description.empty() ? adapter.name : adapter.description}, {"kind", "hardware"}});
+                json item = {
+                    {"id", adapter.name},
+                    {"name", adapter.description.empty() ? adapter.name : adapter.description},
+                    {"kind", "hardware"},
+                };
+#ifdef _WIN32
+                const auto info = windowsAdapterInfo(adapter.name);
+                item["scan_eligible"] = info && info->ethernet && info->hardware && info->up;
+                item["interface_type"] = info && info->ethernet ? "ethernet" : "other";
+                item["is_hardware"] = info && info->hardware;
+                item["is_up"] = info && info->up;
+#else
+                item["scan_eligible"] = adapter.name != "lo";
+#endif
+                adapters.push_back(std::move(item));
             }
         } catch (const std::exception&) {
             // The UI explains the Npcap prerequisite when no adapters are available.
@@ -231,11 +427,17 @@ dw_ec_result DW_EC_BRIDGE_CALL dw_ec_start(dw_ec_context* context) {
     if (context == nullptr) return DW_EC_INVALID_ARGUMENT;
     if (!context->scanned) return DW_EC_NOT_READY;
     return guard(context, [&]() {
+        // Output FMMUs do not contribute their operational working-counter
+        // increments while the bus is still in SAFE-OP. Keep process data
+        // moving during the transition, but validate it only after OP has
+        // been reached (the module performs an immediate verified exchange).
         auto error = [](kickcat::DatagramState const&) {};
-        context->bus->processDataReadWrite(error);
+        context->bus->processDataWrite(error);
+        context->bus->processDataRead(error);
         context->bus->requestState(kickcat::State::OPERATIONAL);
         context->bus->waitForState(kickcat::State::OPERATIONAL, 500ms, [&]() {
-            context->bus->processDataReadWrite(error);
+            context->bus->processDataWrite(error);
+            context->bus->processDataRead(error);
         });
         context->running = true;
     });
@@ -254,16 +456,15 @@ dw_ec_result DW_EC_BRIDGE_CALL dw_ec_exchange(dw_ec_context* context,
     return guard(context, [&]() {
         const auto started = std::chrono::steady_clock::now();
         if (output_size != 0) std::memcpy(context->iomap.data() + context->input_size, outputs, output_size);
-        bool failed = false;
-        context->bus->processDataReadWrite([&](kickcat::DatagramState const&) { failed = true; });
+        const auto actual_wkc = processLogicalData(*context,
+            [](kickcat::DatagramState const&) {});
         if (input_size != 0) std::memcpy(inputs, context->iomap.data(), input_size);
         ++context->cycle_count;
         status->expected_wkc = context->expected_wkc;
-        status->actual_wkc = failed ? 0 : context->expected_wkc;
+        status->actual_wkc = actual_wkc;
         status->exchange_duration_ns = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - started).count());
         status->cycle_count = context->cycle_count;
-        if (failed) throw std::runtime_error("KickCAT reported a lost or invalid process-data datagram.");
     });
 }
 

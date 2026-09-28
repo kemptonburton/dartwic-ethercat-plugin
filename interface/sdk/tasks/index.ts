@@ -27,6 +27,7 @@ export function useTaskConfigBridge(taskEditor: TaskConfigRegistration | null | 
         cancelLabel = "CANCEL",
         onSave = null,
         onCancel = null,
+        moduleConnection = null,
     } = config;
 
     (React as any).useEffect(() => {
@@ -39,6 +40,7 @@ export function useTaskConfigBridge(taskEditor: TaskConfigRegistration | null | 
             cancelLabel,
             onSave,
             onCancel,
+            moduleConnection,
         });
     }, [
         taskEditor,
@@ -50,6 +52,7 @@ export function useTaskConfigBridge(taskEditor: TaskConfigRegistration | null | 
         cancelLabel,
         onSave,
         onCancel,
+        moduleConnection,
     ]);
 }
 

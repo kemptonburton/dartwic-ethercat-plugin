@@ -49,4 +49,14 @@ export interface TaskConfigBridgeState {
     cancelLabel?: string;
     onSave?: (() => Promise<void> | void) | null;
     onCancel?: (() => Promise<void> | void) | null;
+    /** Optional module-instance control rendered by the shared host task-detail body. */
+    moduleConnection?: {
+        pluginId: string;
+        moduleTypeIds?: string[];
+        value?: string;
+        onValueChange?: (value: string) => void;
+        placeholder?: string;
+        description?: string;
+        showConnectionStatus?: boolean;
+    } | null;
 }

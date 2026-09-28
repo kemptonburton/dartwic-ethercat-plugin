@@ -16,6 +16,17 @@ export default definePlugin({
     name: "EtherCAT",
     register(registry) {
         registry.addTaskUi({id: "cycle", name: "EtherCAT Cyclic I/O", card: EthercatTaskCard, editor: EthercatTaskConfig});
-        registry.addModuleUi({id: "master", name: "EtherCAT Master", icon: EthercatIcon, panel: EthercatModuleConfig});
+        registry.addModuleUi({
+            id: "master",
+            name: "EtherCAT Master",
+            icon: EthercatIcon,
+            panel: EthercatModuleConfig,
+            connection: ({instanceConfig}) => ({
+                channel: `${instanceConfig.name}.info.connected`,
+                label: "EtherCAT Master",
+                endpoint: instanceConfig.parameters?.adapter || "NO ADAPTER",
+                connectedValue: 1,
+            }),
+        });
     },
 });
