@@ -24,6 +24,21 @@ FetchContent_Declare(kickcat
     GIT_TAG f10386d54f734d388a405b4dae506801e35c238b
     GIT_SHALLOW FALSE)
 FetchContent_MakeAvailable(kickcat)
+# Keep routine adapter opens silent, including reconnect attempts. Socket and
+# bus failures still propagate to the bridge and the plugin's ARGUS events.
+set(KICKCAT_HELPERS_SOURCE "${kickcat_SOURCE_DIR}/lib/master/src/helpers.cc")
+file(READ "${KICKCAT_HELPERS_SOURCE}" KICKCAT_HELPERS_ORIGINAL)
+set(KICKCAT_HELPERS_CONTENT "${KICKCAT_HELPERS_ORIGINAL}")
+string(REPLACE [[printf("Opening nominal interface:   %s\n", nominal_if.c_str());]]
+    "// Adapter-open errors propagate to the caller." KICKCAT_HELPERS_CONTENT "${KICKCAT_HELPERS_CONTENT}")
+string(REPLACE [[printf("Opening redundant interface: %s\n", redundant_if.c_str());]]
+    "// Adapter-open errors propagate to the caller." KICKCAT_HELPERS_CONTENT "${KICKCAT_HELPERS_CONTENT}")
+if(KICKCAT_HELPERS_CONTENT MATCHES "Opening (nominal|redundant) interface")
+    message(FATAL_ERROR "Pinned KickCAT adapter-open logging changed; review the quiet-open patch")
+endif()
+if(NOT KICKCAT_HELPERS_CONTENT STREQUAL KICKCAT_HELPERS_ORIGINAL)
+    file(WRITE "${KICKCAT_HELPERS_SOURCE}" "${KICKCAT_HELPERS_CONTENT}")
+endif()
 if(WIN32)
     # KickCAT 2.6-rc3 stores caller-provided source MACs but still uses its
     # placeholder constants in two transmit paths. Patch the pinned source so
