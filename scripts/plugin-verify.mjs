@@ -56,6 +56,16 @@ async function main() {
 
   if (manifest.contains_engine_plugin) {
     validatePluginManifest(await readJson(path.resolve(engineDir, "plugin.json")));
+    const bridgeName = process.platform === "win32" ? "dartwic_ethercat_bridge.dll"
+      : process.platform === "darwin" ? "libdartwic_ethercat_bridge.dylib"
+      : "libdartwic_ethercat_bridge.so";
+    const bridgePath = path.resolve(engineDir, "bin", bridgeName);
+    const bridge = await fs.readFile(bridgePath);
+    for (const message of ["Opening nominal interface:", "Opening redundant interface:"]) {
+      if (bridge.includes(Buffer.from(message))) {
+        throw new Error(`Packaged bridge still contains routine adapter-open logging. Run npm run build:bridge and rebuild the engine plugin: ${bridgePath}`);
+      }
+    }
   }
 
   if (manifest.contains_interface_plugin) {

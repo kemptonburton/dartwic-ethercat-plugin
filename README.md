@@ -53,6 +53,7 @@ Requirements: Node.js 20+, CMake 3.23+, a vcpkg checkout, and the same supported
 ```shell
 npm ci
 npm run build:interface
+npm run build:bridge
 cmake --preset windows-clang-release
 cmake --build --preset build-windows-clang-release --target copy_engine_plugin
 ```
