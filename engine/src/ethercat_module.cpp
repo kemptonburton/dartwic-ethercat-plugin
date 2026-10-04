@@ -6,8 +6,11 @@
 namespace EtherCAT {
 EthercatModule::EthercatModule(nlohmann::json config, DARTWIC::API::SDK_API* api)
     : BaseModule(std::move(config), api),
-      instance_name_(getConfig<std::string>("name")) {
-    const auto channel = instance_name_ + ".info.connected";
+      instance_name_(getConfig<std::string>("name")),
+      connected_channel_(instance_name_ + ".info.connected"),
+      connection_error_title_("ETHERCAT CONNECTION ERROR [" + instance_name_ + "]"),
+      connection_error_channels_{connected_channel_} {
+    const auto& channel = connected_channel_;
     dartwic->upsertChannelField(channel, DARTWIC::API::ChannelField::VALUE,
         0.0, DARTWIC::API::ChannelStorage::Fixed);
     dartwic->upsertChannelField(channel, DARTWIC::API::ChannelField::UNITS,
@@ -26,7 +29,7 @@ void EthercatModule::setConnected(bool connected) noexcept {
 
 void EthercatModule::publishConnectionState() noexcept {
     try {
-        dartwic->setChannel(instance_name_ + ".info.connected",
+        dartwic->setChannel(connected_channel_,
             DARTWIC::API::ChannelValue{connected_ ? 1.0 : 0.0});
     } catch (...) {
         // Connection telemetry must never interfere with connection monitoring.
@@ -36,9 +39,9 @@ void EthercatModule::publishConnectionState() noexcept {
 void EthercatModule::publishConnectionError(const std::string& message) noexcept {
     try {
         dartwic->consoleError(
-            "ETHERCAT CONNECTION ERROR [" + instance_name_ + "]",
+            connection_error_title_,
             message.empty() ? "Unable to exchange EtherCAT process data." : message,
-            {instance_name_ + ".info.connected"},
+            connection_error_channels_,
             "Verify that the selected adapter, EtherCAT network, and devices are available.",
             0);
     } catch (...) {
@@ -58,21 +61,21 @@ void EthercatModule::discardMaster() noexcept {
 void EthercatModule::connectAndVerify() {
     if (!bridge_) bridge_ = std::make_unique<BridgeLibrary>();
     auto candidate = std::make_unique<BridgeLibrary::Master>(*bridge_, bridgeConfig());
-    const auto topology = candidate->scan();
+    auto topology = candidate->scan();
     candidate->start();
 
-    std::vector<uint8_t> outputs(candidate->outputSize(), uint8_t{0});
-    std::vector<uint8_t> inputs(candidate->inputSize(), uint8_t{0});
-    const auto status = candidate->exchange(outputs, inputs);
+    // discardMaster clears sizes but retains capacity for the next verified
+    // connection. Reinitialize outputs so a reconnect never transmits stale data.
+    monitor_output_image_.assign(candidate->outputSize(), uint8_t{0});
+    monitor_input_image_.assign(candidate->inputSize(), uint8_t{0});
+    const auto status = candidate->exchange(monitor_output_image_, monitor_input_image_);
     if (status.expected_wkc <= 0 || status.actual_wkc != status.expected_wkc) {
         throw std::runtime_error("EtherCAT working counter mismatch: expected " +
             std::to_string(status.expected_wkc) + ", received " +
             std::to_string(status.actual_wkc) + ".");
     }
 
-    cached_topology_ = topology;
-    monitor_output_image_ = std::move(outputs);
-    monitor_input_image_ = std::move(inputs);
+    cached_topology_ = std::move(topology);
     master_ = std::move(candidate);
     next_reconnect_attempt_ = {};
     last_exchange_ = std::chrono::steady_clock::now();

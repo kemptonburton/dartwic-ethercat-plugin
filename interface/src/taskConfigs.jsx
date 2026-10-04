@@ -58,7 +58,6 @@ export function EthercatTaskConfig({task, operation, onSaved, onClose, taskEdito
     const [saving, setSaving] = React.useState(false);
     const [error, setError] = React.useState("");
     const nextRow = React.useRef(0);
-    const initialScanStarted = React.useRef(false);
     const entries = React.useMemo(() => {
         const merged = flattenEntries(topology);
         const knownKeys = new Set(merged.map(entryKey));
@@ -96,11 +95,6 @@ export function EthercatTaskConfig({task, operation, onSaved, onClose, taskEdito
         catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
         finally { setScanning(false); }
     }, [instance, operation]);
-    React.useEffect(() => {
-        if (initialScanStarted.current || !instance || mappings.length === 0) return;
-        initialScanStarted.current = true;
-        void scan();
-    }, [instance, mappings.length, scan]);
     async function saveTask() {
         if (!instance) return setError("SELECT AN ETHERCAT MASTER.");
         if (payload.mappings.length === 0) return setError("ADD AT LEAST ONE COMPLETE PDO MAPPING.");

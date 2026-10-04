@@ -12,6 +12,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include "channel_references.h"
 
 namespace TEMPEST { class Transport; class Peer; }
 
@@ -177,6 +178,7 @@ namespace DARTWIC::API {
         std::string category;
         std::vector<OperationArgumentDefinition> arguments;
         OperationHandler handler;
+        bool allow_viewers = false;
     };
 
     /** Declares an operator-visible telemetry topic before its first publication.
@@ -318,6 +320,10 @@ namespace DARTWIC::API {
         TaskMissedFunction on_missed;
         TaskLifecycleFunction on_end;
         TaskCleanupFunction cleanup;
+        // Suppress timing warnings; scheduling, measurements and callback errors remain active.
+        void setDisableWarnings(bool disabled = true) {
+            metadata.default_arguments["disable_warnings"] = disabled;
+        }
     };
 
     /**
@@ -498,11 +504,8 @@ namespace DARTWIC::API {
          * @returns The plugin-qualified operation identifier.
          */
         virtual std::string registerOperation(OperationDefinition definition) = 0;
-
-        /**
-         * Convenience overload for operations that only need an ID, display name, and handler.
-         * This keeps source compatibility without adding another virtual interface contract.
-         */
+        // Convenience for operations without argument metadata. Delegates to the
+        // registered definition and does not add a virtual slot to the SDK ABI.
         std::string registerOperation(std::string local_id, std::string name, OperationHandler handler) {
             OperationDefinition definition;
             definition.id = std::move(local_id);
@@ -520,15 +523,15 @@ namespace DARTWIC::API {
          */
         virtual std::string registerTelemetry(TelemetryDefinition definition) = 0;
         /**
-         * Calls a named operation on a connected TEMPEST peer and waits for its result.
-         * Payloads use JSON at the engine SDK boundary; Peer and custom transports use Value.
-         * A timeout reports unknown completion and never retries the operation.
+         * Calls a registered TEMPEST operation on the current node or a connected peer.
+         * Payloads use JSON at the engine SDK boundary; peers use Value.
+         * A remote timeout reports unknown completion and never retries the operation.
          * @dartwic-reference
          * @category Operations
-         * @param node Remote node name.
+         * @param node Current engine node name or connected remote node name.
          * @param operation Fully qualified operation name, such as fprime/command.
          * @param payload Operation arguments.
-         * @returns The remote result; throws on disconnection, timeout, or remote failure.
+         * @returns The operation result; throws on local failure, disconnection, timeout, or remote failure.
          */
         virtual nlohmann::json callTempest(const std::string& node, const std::string& operation,
                                            const nlohmann::json& payload) {
@@ -785,6 +788,59 @@ namespace DARTWIC::API {
             (void)notification_id;
             return false;
         }
+
+        /**
+         * Appends text to an ARGUS log stream without creating an operator event.
+         * Plugin calls use a plugin-qualified stream name, such as `ethercat/Bus`.
+         * The engine supplies the node, session, timestamp, and sequence. Writes
+         * are asynchronous and return false if the bounded queue is full.
+         * @dartwic-reference
+         * @category Logs
+         * @param stream Plugin-local stream name, such as `Bus`.
+         * @param text Text to append; a trailing newline is optional.
+         * @param channel `stdout` or `stderr` for console-style coloring.
+         * @param level `info`, `warning`, or `error` for filtering.
+         * @returns Whether ARGUS accepted the text for writing.
+         * @example api.writeLog("Bus", "Device connected", "stdout", "info");
+         */
+        virtual bool writeLog(const std::string& stream, const std::string& text,
+            const std::string& channel = "stdout", const std::string& level = "info") {
+            (void)stream;
+            (void)text;
+            (void)channel;
+            (void)level;
+            return false;
+        }
+
+        /** Optional channel references held only in plugin-private memory.
+         * Register during onPluginLoaded. The callback runs during a Project
+         * audit, never in a task loop. Add exact references or scan structured
+         * plugin data with the sink. Ordinary task data, fixed bindings,
+         * project files, and channel origins are found automatically.
+         * New virtual methods belong at the end of SDK_API so plugins compiled
+         * against an earlier SDK keep the same virtual method positions.
+         */
+        virtual void registerChannelReferenceSource(std::string local_id,
+            std::function<void(ChannelReferenceSink&)> collect) {
+            (void)local_id;
+            (void)collect;
+            throw std::runtime_error("Channel reference sources are unavailable in this SDK host.");
+        }
+
+        /**
+         * Calls a saved pinned operation on the current engine or a connected remote node once.
+         * @dartwic-reference
+         * @category Operations
+         * @param node Current engine node name or connected remote node name.
+         * @param preset Stable pinned-operation ID or unambiguous label for that node.
+         * @param overrides Object merged over saved operation arguments.
+         * @returns Operation result; throws if the preset is missing, ambiguous, or invocation fails.
+         */
+        virtual nlohmann::json callPinnedTempest(const std::string& node, const std::string& preset,
+                                                  const nlohmann::json& overrides = nlohmann::json::object()) {
+            throw std::runtime_error("Pinned TEMPEST peer calls are unavailable in this SDK host.");
+        }
+
     };
 
     inline void SDK_API::createFixedChannel(const std::string& channel, double initial_value) {

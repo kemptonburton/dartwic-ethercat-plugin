@@ -39,6 +39,9 @@ namespace EtherCAT {
         void publishConnectionError(const std::string& message) noexcept;
 
         std::string instance_name_;
+        std::string connected_channel_;
+        std::string connection_error_title_;
+        std::vector<std::string> connection_error_channels_;
         mutable std::mutex mutex_;
         std::string task_owner_;
         std::unique_ptr<BridgeLibrary> bridge_;
