@@ -2,7 +2,7 @@
   "id": "ethercat",
   "name": "EtherCAT",
   "description": "High-speed cyclic EtherCAT I/O for DARTWIC using a KickCAT C bridge.",
-  "author": "Voit Systems",
+  "author": "Kempton Burton",
   "version": "0.1.0",
   "minEngineVersion": "2.0.0-beta.3",
   "minInterfaceVersion": "2.0.0-beta.3",
