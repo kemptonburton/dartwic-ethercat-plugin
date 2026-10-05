@@ -1,4 +1,15 @@
 import { createHostComponent } from "../internal/createHostComponent.ts";
+/** Reusable numeric editor driven by the channel's Units formatting directive.  @dartwic-reference @category UI Components */
+export const FormattedValueInput = createHostComponent<{
+    value: number; units?: string; label?: string; submitLabel?: string; disabled?: boolean;
+    onCommit(value: number): unknown; onCancel?(): void;
+}>("FormattedValueInput", (hostApi) => hostApi.components.FormattedValueInput);
+/** Popover with formatted display and the registered value editor.  @dartwic-reference @category UI Components */
+export const FormattedValueControl = createHostComponent<{
+    value: number; units?: string; label?: string; submitLabel?: string; disabled?: boolean;
+    onCommit(value: number): unknown; children?: any; className?: string;
+    variant?: "default" | "outline" | "ghost" | "link" | "secondary" | "destructive";
+}>("FormattedValueControl", (hostApi) => hostApi.components.FormattedValueControl);
 import type {
     ButtonProps,
     CardContentProps,
@@ -11,6 +22,7 @@ import type {
     DialogFooterProps,
     DialogHeaderProps,
     DialogTitleProps,
+    HostComponentProps,
     InputProps,
     LabelProps,
     ScrollAreaProps,
@@ -45,6 +57,16 @@ export const CardHeader = createHostComponent<CardHeaderProps>("CardHeader", (ho
 export const CardTitle = createHostComponent<CardTitleProps>("CardTitle", (hostApi) => hostApi.components.CardTitle);
 /** Boolean or indeterminate checkbox. @dartwic-reference @category UI Components */
 export const Checkbox = createHostComponent<CheckboxProps>("Checkbox", (hostApi) => hostApi.components.Checkbox);
+/** Root component for a context menu. @dartwic-reference @category UI Components */
+export const ContextMenu = createHostComponent<HostComponentProps>("ContextMenu", (hostApi) => hostApi.components.ContextMenu);
+/** Container for context menu actions. @dartwic-reference @category UI Components */
+export const ContextMenuContent = createHostComponent<HostComponentProps>("ContextMenuContent", (hostApi) => hostApi.components.ContextMenuContent);
+/** Selectable context menu action. @dartwic-reference @category UI Components */
+export const ContextMenuItem = createHostComponent<HostComponentProps>("ContextMenuItem", (hostApi) => hostApi.components.ContextMenuItem);
+/** Visual separator between context menu groups. @dartwic-reference @category UI Components */
+export const ContextMenuSeparator = createHostComponent<HostComponentProps>("ContextMenuSeparator", (hostApi) => hostApi.components.ContextMenuSeparator);
+/** Element whose context action opens the menu. @dartwic-reference @category UI Components */
+export const ContextMenuTrigger = createHostComponent<HostComponentProps>("ContextMenuTrigger", (hostApi) => hostApi.components.ContextMenuTrigger);
 /** Accessible dialog description. @dartwic-reference @category UI Components */
 export const DialogDescription = createHostComponent<DialogDescriptionProps>("DialogDescription", (hostApi) => hostApi.components.DialogDescription);
 /** Dialog action footer. @dartwic-reference @category UI Components */

@@ -5,4 +5,10 @@ export function defineResource(definition: ResourceDefinition): ResourceDefiniti
     return definition;
 }
 
-export type { ResourceDefinition, ResourceType } from "./types.ts";
+export type {
+    ResourceComponentProps,
+    ResourceDefinition,
+    ResourceErrorState,
+    ResourceType,
+    SaveResourceContentOptions,
+} from "./types.ts";

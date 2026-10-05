@@ -1,8 +1,0 @@
-{
-  "id": "starter_interface_plugin",
-  "name": "Starter Interface Plugin",
-  "version": "0.2.0",
-  "minInterfaceVersion": "1.0.0-pre_release",
-  "contains_engine_plugin": false,
-  "contains_interface_plugin": true
-}

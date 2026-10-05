@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <filesystem>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <optional>
@@ -21,6 +22,19 @@ namespace DARTWIC::Modules {
 }
 
 namespace DARTWIC::API {
+    /** Portable shared-asset path below workspace/global_data. @dartwic-reference @category Workspace Assets */
+    inline std::string workspaceAssetPath(const std::string& asset_namespace, const std::string& filename) {
+        const auto safe_segment = [](const std::string& value) {
+            if (value.empty() || value.find("..") != std::string::npos) return false;
+            const auto alphanumeric = [](char c) {return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');};
+            if (!alphanumeric(value.front())) return false;
+            for (char c : value) if (!alphanumeric(c) && c != '_' && c != '-' && c != '.') return false;
+            return true;
+        };
+        if (!safe_segment(asset_namespace) || !safe_segment(filename) || filename.find('.') == std::string::npos)
+            throw std::invalid_argument("Asset namespace and filename must be safe path segments, with a file extension.");
+        return "assets/" + asset_namespace + "/" + filename;
+    }
     /** TEMPEST transport interface used by custom engine connections. */
     using Transport = TEMPEST::Transport;
     using TransportPtr = std::shared_ptr<TEMPEST::Transport>;
@@ -748,7 +762,10 @@ namespace DARTWIC::API {
          * The returned object contains a request_id which can be queried for its typed JSON result.
          * @param ui_id Plugin-local interface workflow identifier.
          * @param payload Workflow request payload.
-         * @param options Optional workflow behavior and presentation settings.
+         * @param options Optional workflow settings; severity is message (default), warning, or error.
+
+         * @dartwic-reference
+         * @category Interface UI and Notifications
          */
         virtual nlohmann::json requestInterfaceUi(
             const std::string& ui_id,
@@ -839,6 +856,108 @@ namespace DARTWIC::API {
         virtual nlohmann::json callPinnedTempest(const std::string& node, const std::string& preset,
                                                   const nlohmann::json& overrides = nlohmann::json::object()) {
             throw std::runtime_error("Pinned TEMPEST peer calls are unavailable in this SDK host.");
+        }
+
+        /** Reads a shared text/JSON asset from the selected engine workspace.
+         * @dartwic-reference
+         * @category Workspace Assets
+         * @param node Target engine node name.
+         * @param asset_namespace Shared asset namespace.
+         * @param filename Asset filename including extension.
+         * @returns Text content of the asset.
+         */
+        std::string readWorkspaceAsset(const std::string& node, const std::string& asset_namespace, const std::string& filename) {
+            return callTempest(node, "dartwic/get-file", {{"rootDir", "global_data_directory"},
+                {"filePath", workspaceAssetPath(asset_namespace, filename)}}).at("content").get<std::string>();
+        }
+
+        /** Saves a shared text/JSON asset and returns its portable reference. Keep binary data in a base64 package.
+         * @dartwic-reference
+         * @category Workspace Assets
+         * @param node Target engine node name.
+         * @param asset_namespace Shared asset namespace.
+         * @param filename Asset filename including extension.
+         * @param content Text or JSON package to save.
+         * @returns Workspace-relative asset reference.
+         */
+        std::string saveWorkspaceAsset(const std::string& node, const std::string& asset_namespace,
+                                      const std::string& filename, const std::string& content) {
+            const auto path = workspaceAssetPath(asset_namespace, filename);
+            callTempest(node, "dartwic/save-file", {{"rootDir", "global_data_directory"}, {"path", path}, {"content", content}});
+            return path;
+        }
+
+        /** Resolves a local path below a named root.
+         * @dartwic-reference
+         * @category Storage
+         * @param scope installation, instance, workspace, project, settings, runtime or cache.
+         * @param relative Relative path below the selected root.
+         * @param project Project name; empty selects the active project.
+         * @returns Absolute path on the engine computer.
+         */
+        virtual std::string storagePath(const std::string& scope, const std::string& relative,
+                                        const std::string& project = "") {
+            throw std::runtime_error("Storage path helpers are unavailable in this host.");
+        }
+        std::filesystem::path installationPath(const std::string& path = "") { return storagePath("installation", path); }
+        std::filesystem::path instancePath(const std::string& path = "") { return storagePath("instance", path); }
+        std::filesystem::path workspacePath(const std::string& path = "") { return storagePath("workspace", path); }
+        std::filesystem::path projectPath(const std::string& path = "", const std::string& project = "") { return storagePath("project", path, project); }
+        std::filesystem::path projectSettingsPath(const std::string& path = "", const std::string& project = "") { return storagePath("settings", path, project); }
+        std::filesystem::path projectRuntimePath(const std::string& path = "", const std::string& project = "") { return storagePath("runtime", path, project); }
+        std::filesystem::path projectCachePath(const std::string& path = "", const std::string& project = "") { return storagePath("cache", path, project); }
+        /** Returns effective policy plus its workspace/project overrides and sources.
+         * @dartwic-reference
+         * @category Storage
+         * @param defaults Caller defaults overlaid by portable policy.
+         * @param project Project name; empty selects the active project.
+         * @returns Effective settings, stored layers, leaf sources and revision.
+         */
+        virtual nlohmann::json readEffectiveSettings(const nlohmann::json& defaults = nlohmann::json::object(), const std::string& project = "") {
+            throw std::runtime_error("Settings helpers are unavailable in this host.");
+        }
+        /** Merges a portable settings override; reset contains JSON pointers to remove.
+         * @dartwic-reference
+         * @category Storage
+         * @param scope workspace or project.
+         * @param patch Intentional settings overrides.
+         * @param reset JSON pointers to remove from this scope.
+         * @param project Project name; empty selects the active project.
+         * @param revision Optional revision token to reject stale edits.
+         * @returns Updated settings snapshot without caller defaults.
+         */
+        virtual nlohmann::json writeSettingsOverride(const std::string& scope, const nlohmann::json& patch,
+            const nlohmann::json& reset = nlohmann::json::array(), const std::string& project = "", const std::string& revision = "") {
+            throw std::runtime_error("Settings helpers are unavailable in this host.");
+        }
+        nlohmann::json resetSettingsOverride(const std::string& scope, const nlohmann::json& pointers,
+            const std::string& project = "", const std::string& revision = "") {
+            return writeSettingsOverride(scope, nlohmann::json::object(), pointers, project, revision);
+        }
+        /** Reads JSON below a storage root.
+         * @dartwic-reference
+         * @category Storage
+         * @param scope Named storage root.
+         * @param path Relative JSON filename.
+         * @param missing Value returned when the file does not exist.
+         * @param project Project name; empty selects the active project.
+         * @returns Parsed JSON; corrupt and unreadable files throw.
+         */
+        virtual nlohmann::json readStorageJson(const std::string& scope, const std::string& path,
+            const nlohmann::json& missing = nullptr, const std::string& project = "") {
+            throw std::runtime_error("JSON storage helpers are unavailable in this host.");
+        }
+        /** Atomically saves JSON below a storage root.
+         * @dartwic-reference
+         * @category Storage
+         * @param scope Named storage root.
+         * @param path Relative JSON filename.
+         * @param value JSON document to save.
+         * @param project Project name; empty selects the active project.
+         */
+        virtual void writeStorageJson(const std::string& scope, const std::string& path,
+            const nlohmann::json& value, const std::string& project = "") {
+            throw std::runtime_error("JSON storage helpers are unavailable in this host.");
         }
 
     };
