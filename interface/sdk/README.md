@@ -129,3 +129,45 @@ styling by default; `variant` can be overridden). Editors use a compact input/se
 button group. Unix time uses a shadcn calendar plus local time input; mission time accepts `T-5h`, `T+2m 30s` and
 `T-00:05:00`. Timeline telemetry stays read-only: use timeline clock operations
 to change its anchor with a preview and explicit bucket decisions.
+
+# Host UI components
+
+Import general-purpose controls from `@dartwic/interface-sdk/ui`. They are
+rendered by the interface host, so they use the same implementation and current
+theme as built-in screens. The catalog covers forms, cards, tables, dialogs,
+menus, popovers, navigation, layout, and loading states. Use
+`@dartwic/interface-sdk/ui/dartwic` for channel, task, and module controls.
+Do not import files from `interface/gui` or bundle a second React runtime.
+
+```tsx
+import React from "@dartwic/interface-sdk/react";
+import {
+    Button, Card, CardContent, CardHeader, CardTitle,
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from "@dartwic/interface-sdk/ui";
+
+export function ExamplePanel() {
+    return <Card>
+        <CardHeader><CardTitle>Device overview</CardTitle></CardHeader>
+        <CardContent>
+            <Dialog>
+                <DialogTrigger asChild><Button variant="outline">Details</Button></DialogTrigger>
+                <DialogContent><DialogHeader><DialogTitle>Device details</DialogTitle></DialogHeader></DialogContent>
+            </Dialog>
+        </CardContent>
+    </Card>;
+}
+```
+
+Use the `dartwicTailwindPreset` from `@dartwic/interface-sdk/tailwind-preset`
+when building plugin CSS. Prefer semantic classes such as `bg-card`,
+`text-foreground`, and `border-border`; their values follow the host's light,
+dark, and customized appearance. Plugin-specific utility classes must be
+included in the plugin's compiled CSS. Avoid hard-coded colors and private GUI
+class names.
+
+The expanded UI catalog is part of Interface 2.0.0. Set the plugin's
+`minInterfaceVersion` to `2.0.0` when using these exports. An older host rejects
+an incompatible plugin during load; a missing host component also produces a
+named error when rendered. The generated Interface SDK reference in the DARTWIC
+documentation lists every export and its import path.

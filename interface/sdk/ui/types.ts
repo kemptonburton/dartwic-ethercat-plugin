@@ -195,6 +195,143 @@ export interface DialogDescriptionProps extends HostComponentProps {}
 /** Props accepted by a dialog footer. @dartwic-reference @category UI Components */
 export interface DialogFooterProps extends HostComponentProps {}
 
+/** Open state for a host dialog. @dartwic-reference @category UI Components */
+export interface DialogProps extends HostComponentProps {
+    open?: boolean;
+    defaultOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    modal?: boolean;
+}
+
+/** Styled dialog body. @dartwic-reference @category UI Components */
+export interface DialogContentProps extends HostComponentProps {
+    /** Hide the built-in close button when the workflow supplies its own. */
+    hideClose?: boolean;
+    /** Classes for the built-in close button. */
+    closeClassName?: string;
+}
+
+/** Value identifying an accordion section. @dartwic-reference @category UI Components */
+export interface AccordionItemProps extends HostComponentProps {
+    value: string;
+    disabled?: boolean;
+}
+
+/** Trigger rendered through its child control when `asChild` is true. @dartwic-reference @category UI Components */
+export interface AsChildTriggerProps extends HostComponentProps {
+    asChild?: boolean;
+    disabled?: boolean;
+}
+
+/** Controlled state for a dropdown menu. @dartwic-reference @category UI Components */
+export interface MenuRootProps extends HostComponentProps {
+    open?: boolean;
+    defaultOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    modal?: boolean;
+}
+
+/** Selectable dropdown or context menu action. @dartwic-reference @category UI Components */
+export interface MenuItemProps extends HostComponentProps {
+    disabled?: boolean;
+    inset?: boolean;
+    onSelect?: HostEventHandler;
+}
+
+/** Search field inside a host command menu. @dartwic-reference @category UI Components */
+export interface CommandInputProps extends HostComponentProps {
+    value?: string;
+    onValueChange?: (value: string) => void;
+    placeholder?: string;
+    disabled?: boolean;
+}
+
+/** Controlled multiline text field. @dartwic-reference @category UI Components */
+export interface TextareaProps extends HostComponentProps {
+    value?: string;
+    defaultValue?: string;
+    onChange?: HostEventHandler;
+    placeholder?: string;
+    disabled?: boolean;
+    rows?: number;
+}
+
+/** Numeric range control; values are arrays even for a single thumb. @dartwic-reference @category UI Components */
+export interface SliderProps extends HostComponentProps {
+    value?: number[];
+    defaultValue?: number[];
+    onValueChange?: (value: number[]) => void;
+    onValueCommit?: (value: number[]) => void;
+    min?: number;
+    max?: number;
+    step?: number;
+    disabled?: boolean;
+}
+
+/** Pressed-state toggle button. @dartwic-reference @category UI Components */
+export interface ToggleProps extends HostComponentProps {
+    pressed?: boolean;
+    defaultPressed?: boolean;
+    onPressedChange?: (pressed: boolean) => void;
+    variant?: "default" | "outline";
+    size?: "default" | "sm" | "lg";
+    disabled?: boolean;
+}
+
+/** Open state for an anchored host popover. @dartwic-reference @category UI Components */
+export interface PopoverProps extends HostComponentProps {
+    open?: boolean;
+    defaultOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    modal?: boolean;
+}
+
+/** Positioning for anchored popover content. @dartwic-reference @category UI Components */
+export interface PopoverContentProps extends HostComponentProps {
+    side?: "top" | "right" | "bottom" | "left";
+    align?: "start" | "center" | "end";
+    sideOffset?: number;
+}
+
+/** Compact host status label. @dartwic-reference @category UI Components */
+export interface BadgeProps extends HostComponentProps {
+    asChild?: boolean;
+}
+
+/** Theme-aware host color selector. @dartwic-reference @category UI Components */
+export interface ColorPickerProps extends HostComponentProps {
+    value?: string;
+    onValueChange?: (value: string) => void;
+    ariaLabel?: string;
+    disabled?: boolean;
+    variant?: "swatch" | "field";
+    allowThemeColors?: boolean;
+}
+
+/** Numeric value editor selected by a Units formatting directive. @dartwic-reference @category UI Components */
+export interface FormattedValueInputProps extends HostComponentProps {
+    value: number;
+    units?: string;
+    label?: string;
+    submitLabel?: string;
+    disabled?: boolean;
+    onCommit: (value: number) => unknown;
+    onCancel?: () => void;
+    trailingAction?: HostNode;
+    compact?: boolean;
+}
+
+/** Click-to-edit numeric value with a host popover. @dartwic-reference @category UI Components */
+export interface FormattedValueControlProps extends HostComponentProps {
+    value: number;
+    units?: string;
+    label?: string;
+    submitLabel?: string;
+    disabled?: boolean;
+    onCommit: (value: number) => unknown;
+    variant?: "default" | "outline" | "ghost" | "link" | "secondary" | "destructive";
+}
+
 /**
  * Props for the host channel and field selector.
  *
@@ -379,4 +516,44 @@ export interface ModuleRuntimeOverviewProps extends HostComponentProps {
     resolveTaskChannels?: (task: any) => ModuleRuntimeChannel[];
     /** Empty-state copy when no tasks reference the module. */
     emptyMessage?: string;
+}
+
+/** Resource identity for the host presence and sync status icons. @dartwic-reference @category DARTWIC UI Components */
+export interface ResourceStatusIconProps extends HostComponentProps {
+    resource_name?: string;
+    resource_path?: string;
+}
+
+/** Remote view embedded in a plugin resource or schematic. @dartwic-reference @category DARTWIC UI Components */
+export interface EmbeddedRemoteViewProps extends HostComponentProps {
+    commandEnabled?: boolean;
+    schematicPath?: string;
+    remoteViewName?: string;
+}
+
+/** One remote schematic node embedded in a plugin view. @dartwic-reference @category DARTWIC UI Components */
+export interface EmbeddedSchematicNodeProps extends HostComponentProps {
+    commandEnabled?: boolean;
+    schematicPath?: string;
+    nodeId?: string;
+}
+
+/** Links active ARGUS alerts for the supplied channels. @dartwic-reference @category DARTWIC UI Components */
+export interface ConsoleAlertProps extends HostComponentProps {
+    alertTags: string[];
+}
+
+/** Shows stale or missing channel context. @dartwic-reference @category DARTWIC UI Components */
+export interface StaleChannelsTooltipProps extends HostComponentProps {
+    channelValuePaths?: string[];
+    channelNames?: string[];
+    notFoundChannelNames?: string[];
+    contextTitle?: string;
+}
+
+/** Edits a conditional configuration block. @dartwic-reference @category DARTWIC UI Components */
+export interface IfElseBlockProps extends HostComponentProps {
+    initialData: Record<string, unknown>;
+    onDataChange: (data: Record<string, unknown>) => void;
+    compact?: boolean;
 }

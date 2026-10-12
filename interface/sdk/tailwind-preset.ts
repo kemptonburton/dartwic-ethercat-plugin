@@ -6,8 +6,8 @@ export const dartwicTailwindPreset = {
     theme: {
         extend: {
             fontFamily: {
-                sans: ["Roboto Mono", "monospace"],
-                mono: ["Roboto Mono", "monospace"],
+                sans: ["var(--font-interface)"],
+                mono: ["var(--font-interface)"],
             },
             borderRadius: {
                 lg: "var(--radius)",

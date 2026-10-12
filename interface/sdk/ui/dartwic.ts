@@ -1,6 +1,6 @@
 import { createHostComponent } from "../internal/createHostComponent.ts";
 import { getHostApi } from "../internal/host.ts";
-import type {ChannelComboBoxProps, ComboboxSearchProps, ConfigurableInputProps, ManualRefreshButtonProps, ModuleConnectionStatusProps, ModuleInstanceConnectionProps, ModuleInstanceSelectProps, ModuleRuntimeOverviewProps, TaskBindingTableProps} from "./types.ts";
+import type {ChannelComboBoxProps, ComboboxSearchProps, ConfigurableInputProps, ConsoleAlertProps, EmbeddedRemoteViewProps, EmbeddedSchematicNodeProps, IfElseBlockProps, ManualRefreshButtonProps, ModuleConnectionStatusProps, ModuleInstanceConnectionProps, ModuleInstanceSelectProps, ModuleRuntimeOverviewProps, ResourceStatusIconProps, StaleChannelsTooltipProps, TaskBindingTableProps} from "./types.ts";
 
 /** Selects a DARTWIC channel and, optionally, one of its fields. @dartwic-reference @category DARTWIC UI Components */
 export const ChannelComboBox = createHostComponent<ChannelComboBoxProps>("ChannelComboBox", (hostApi) => hostApi.helpers.ChannelComboBox);
@@ -21,19 +21,19 @@ export const ModuleRuntimeOverview = createHostComponent<ModuleRuntimeOverviewPr
 /** Renders the standard editable task channel-binding table. @dartwic-reference @category DARTWIC UI Components */
 export const TaskBindingTable = createHostComponent<TaskBindingTableProps>("TaskBindingTable", (hostApi) => hostApi.helpers.TaskBindingTable);
 /** Show the participants associated with a resource. @dartwic-reference @category DARTWIC UI Components */
-export const ResourceParticipantsIcon = createHostComponent<Record<string, unknown>>("ResourceParticipantsIcon", (hostApi) => hostApi.components.ResourceParticipantsIcon);
+export const ResourceParticipantsIcon = createHostComponent<ResourceStatusIconProps>("ResourceParticipantsIcon", (hostApi) => hostApi.components.ResourceParticipantsIcon);
 /** Show resource synchronization status. @dartwic-reference @category DARTWIC UI Components */
-export const ResourceSyncStatusIcon = createHostComponent<Record<string, unknown>>("ResourceSyncStatusIcon", (hostApi) => hostApi.components.ResourceSyncStatusIcon);
+export const ResourceSyncStatusIcon = createHostComponent<ResourceStatusIconProps>("ResourceSyncStatusIcon", (hostApi) => hostApi.components.ResourceSyncStatusIcon);
 /** Embed a remote engine view using the host component. @dartwic-reference @category DARTWIC UI Components */
-export const EmbeddedRemoteView = createHostComponent<Record<string, unknown>>("EmbeddedRemoteView", (hostApi) => hostApi.components.EmbeddedRemoteView);
+export const EmbeddedRemoteView = createHostComponent<EmbeddedRemoteViewProps>("EmbeddedRemoteView", (hostApi) => hostApi.components.EmbeddedRemoteView);
 /** Embed a schematic node using the host component. @dartwic-reference @category DARTWIC UI Components */
-export const EmbeddedSchematicNode = createHostComponent<Record<string, unknown>>("EmbeddedSchematicNode", (hostApi) => hostApi.components.EmbeddedSchematicNode);
+export const EmbeddedSchematicNode = createHostComponent<EmbeddedSchematicNodeProps>("EmbeddedSchematicNode", (hostApi) => hostApi.components.EmbeddedSchematicNode);
 /** Display an alert in the host console presentation. @dartwic-reference @category DARTWIC UI Components */
-export const ConsoleAlert = createHostComponent<Record<string, unknown>>("ConsoleAlert", (hostApi) => hostApi.components.ConsoleAlert);
+export const ConsoleAlert = createHostComponent<ConsoleAlertProps>("ConsoleAlert", (hostApi) => hostApi.components.ConsoleAlert);
 /** Display details about stale channel data. @dartwic-reference @category DARTWIC UI Components */
-export const StaleChannelsTooltip = createHostComponent<Record<string, unknown>>("StaleChannelsTooltip", (hostApi) => hostApi.components.StaleChannelsTooltip);
+export const StaleChannelsTooltip = createHostComponent<StaleChannelsTooltipProps>("StaleChannelsTooltip", (hostApi) => hostApi.components.StaleChannelsTooltip);
 /** Edit conditional branch configuration with the host component. @dartwic-reference @category DARTWIC UI Components */
-export const IfElseBlock = createHostComponent<Record<string, unknown>>("IfElseBlock", (hostApi) => hostApi.components.IfElseBlock);
+export const IfElseBlock = createHostComponent<IfElseBlockProps>("IfElseBlock", (hostApi) => hostApi.components.IfElseBlock);
 /** Configure an abstracted schematic button node. @dartwic-reference @category DARTWIC UI Components */
 export const AbstractedButtonNodeConfig = createHostComponent<Record<string, unknown>>("AbstractedButtonNodeConfig", (hostApi) => hostApi.components.AbstractedButtonNodeConfig);
 
@@ -81,4 +81,4 @@ export const buildParameterDisplayNodeDefinitionFromChannel = (channel: unknown,
 /** Normalize a legacy channel and field reference using host rules. @dartwic-reference @category DARTWIC UI Components */
 export const normalizeLegacyChannelFieldReference = (value: string, field?: string | null) => callHelper("normalizeLegacyChannelFieldReference", [value, field]);
 
-export type {ChannelComboBoxProps, ComboboxSearchItem, ComboboxSearchProps, ConfigurableInputProps, ManualRefreshButtonProps, ModuleConnectionStatusProps, ModuleInstanceConnectionProps, ModuleInstanceSelectProps, ModuleRuntimeChannel, ModuleRuntimeOverviewProps, TaskBinding, TaskBindingTableProps} from "./types.ts";
+export type {ChannelComboBoxProps, ComboboxSearchItem, ComboboxSearchProps, ConfigurableInputProps, ConsoleAlertProps, EmbeddedRemoteViewProps, EmbeddedSchematicNodeProps, IfElseBlockProps, ManualRefreshButtonProps, ModuleConnectionStatusProps, ModuleInstanceConnectionProps, ModuleInstanceSelectProps, ModuleRuntimeChannel, ModuleRuntimeOverviewProps, ResourceStatusIconProps, StaleChannelsTooltipProps, TaskBinding, TaskBindingTableProps} from "./types.ts";
