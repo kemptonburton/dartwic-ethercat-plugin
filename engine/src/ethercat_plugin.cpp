@@ -5,6 +5,7 @@
 #include "ethercat_module.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <memory>
 #include <stdexcept>
@@ -39,17 +40,20 @@ struct CycleContext {
     std::shared_ptr<EthercatModule> module;
     std::vector<Mapping> outputs;
     std::vector<Mapping> inputs;
-    DARTWIC::API::FixedChannelBatch output_channels;
-    DARTWIC::API::FixedChannelBatch output_readback_channels;
-    DARTWIC::API::FixedChannelBatch input_channels;
-    DARTWIC::API::FixedChannelBatch diagnostic_channels;
+    std::vector<DARTWIC::API::FixedChannelHandle> output_channels;
+    std::vector<DARTWIC::API::FixedChannelHandle> output_readback_channels;
+    std::vector<DARTWIC::API::FixedChannelHandle> input_channels;
+    std::array<DARTWIC::API::FixedChannelHandle, 4> diagnostic_channels;
     std::vector<double> output_values;
     std::vector<double> output_readback_values;
     std::vector<double> input_values;
-    std::vector<double> diagnostic_values;
+    std::array<double, 4> diagnostic_values{};
     std::vector<uint8_t> output_image;
     std::vector<uint8_t> input_image;
     std::string task_name;
+    std::string cycle_error_title;
+    std::vector<std::string> cycle_error_channels;
+    std::chrono::steady_clock::time_point last_failure_report{};
     uint64_t consecutive_failures = 0;
 };
 
@@ -58,7 +62,7 @@ std::string diagnosticChannel(const std::string& task, const char* suffix) {
 }
 
 void createFixedChannel(DARTWIC::API::SDK_API* api, const std::string& channel, double initial = 0.0) {
-    api->upsertChannelField(channel, ChannelField::VALUE, initial, ChannelStorage::Fixed);
+    (void)api->createFixedChannel(channel, initial);
 }
 
 void createObservedChannel(DARTWIC::API::SDK_API* api,
@@ -152,39 +156,43 @@ void configureCycle(DARTWIC::API::SDK_API* api, DARTWIC::API::TaskRuntime& runti
         diagnosticChannel(runtime.getTaskName(), "expected_wkc"));
     createObservedChannel(module->dartwic,
         diagnosticChannel(runtime.getTaskName(), "failure_count"));
-}
-
-std::shared_ptr<CycleContext> startCycle(DARTWIC::API::SDK_API* api,
-    DARTWIC::API::TaskRuntime& runtime) {
-    const auto& arguments = runtime.getArguments();
     auto context = std::make_shared<CycleContext>();
     context->task_name = runtime.getTaskName();
-    context->module = moduleFor(api, arguments.value("module_instance_name", std::string{}));
-    for (auto& mapping : parseMappings(arguments)) {
-        (mapping.channel_to_device ? context->outputs : context->inputs).push_back(std::move(mapping));
+    context->cycle_error_title = "ETHERCAT CYCLE ERROR [" + instance + "]";
+    context->module = std::move(module);
+    for (auto mapping : mappings) {
+        if (mapping.channel_to_device) {
+            context->output_channels.push_back(context->module->dartwic->createFixedChannel(mapping.channel));
+            context->output_readback_channels.push_back(
+                context->module->dartwic->createFixedChannel(mapping.readback_channel));
+            context->outputs.push_back(std::move(mapping));
+        } else {
+            context->input_channels.push_back(context->module->dartwic->createFixedChannel(mapping.channel));
+            context->inputs.push_back(std::move(mapping));
+        }
     }
+    for (const auto& mapping : context->inputs) context->cycle_error_channels.push_back(mapping.channel);
+    constexpr std::array<const char*, 4> suffixes = {
+        "exchange_time_us", "actual_wkc", "expected_wkc", "failure_count"};
+    for (size_t index = 0; index < suffixes.size(); ++index) {
+        context->diagnostic_channels[index] = context->module->dartwic->createFixedChannel(
+            diagnosticChannel(context->task_name, suffixes[index]));
+    }
+    context->output_values.resize(context->outputs.size());
+    context->output_readback_values.resize(context->outputs.size());
+    context->input_values.resize(context->inputs.size());
+    runtime.setTypedRuntimeContext("ethercat.cycle", context);
+}
+
+void startCycle(DARTWIC::API::SDK_API* api,
+    DARTWIC::API::TaskRuntime& runtime) {
+    const auto context = runtime.getTypedRuntimeContext<CycleContext>("ethercat.cycle");
+    if (!context || !context->module) throw std::runtime_error("EtherCAT cycle was not prepared.");
     if (context->outputs.empty() && context->inputs.empty()) {
         throw std::runtime_error(
             "Configure at least one EtherCAT PDO mapping before starting this task.");
     }
 
-    std::vector<std::string> output_names;
-    std::vector<std::string> output_readback_names;
-    std::vector<std::string> input_names;
-    for (const auto& mapping : context->outputs) {
-        output_names.push_back(mapping.channel);
-        output_readback_names.push_back(mapping.readback_channel);
-    }
-    for (const auto& mapping : context->inputs) input_names.push_back(mapping.channel);
-    context->output_channels = context->module->dartwic->resolveFixedChannels(output_names);
-    context->output_readback_channels = context->module->dartwic->resolveFixedChannels(output_readback_names);
-    context->input_channels = context->module->dartwic->resolveFixedChannels(input_names);
-    context->diagnostic_channels = context->module->dartwic->resolveFixedChannels({
-        diagnosticChannel(context->task_name, "exchange_time_us"),
-        diagnosticChannel(context->task_name, "actual_wkc"),
-        diagnosticChannel(context->task_name, "expected_wkc"),
-        diagnosticChannel(context->task_name, "failure_count"),
-    });
     // CAESAR releases task-owned channel authority when a task stops. Restore
     // observe-only ownership on every start, including starts without a new
     // configuration pass. Resolve first so missing channels fail without being
@@ -198,12 +206,13 @@ std::shared_ptr<CycleContext> startCycle(DARTWIC::API::SDK_API* api,
     for (const auto* suffix : {"exchange_time_us", "actual_wkc", "expected_wkc", "failure_count"}) {
         api->setChannel(diagnosticChannel(context->task_name, suffix));
     }
-    context->output_values.resize(context->outputs.size());
-    context->output_readback_values.resize(context->outputs.size());
-    context->input_values.resize(context->inputs.size());
-    context->diagnostic_values.resize(4);
+    if (context->module->isConnected()) {
+        context->output_image.assign(context->module->outputSize(), uint8_t{0});
+        context->input_image.assign(context->module->inputSize(), uint8_t{0});
+        validateMappings(*context);
+    }
+    context->consecutive_failures = 0;
     context->module->start(context->task_name);
-    return context;
 }
 
 uint64_t unixNanoseconds() {
@@ -211,17 +220,49 @@ uint64_t unixNanoseconds() {
         std::chrono::system_clock::now().time_since_epoch()).count());
 }
 
+void publishValues(DARTWIC::API::SDK_API* api,
+    const std::vector<DARTWIC::API::FixedChannelHandle>& channels,
+    const std::vector<double>& values, uint64_t timestamp) {
+    for (size_t index = 0; index < channels.size(); ++index) {
+        if (!api->upsertChannel(channels[index], values[index], timestamp)) {
+            throw std::runtime_error("EtherCAT fixed-channel publication was rejected.");
+        }
+    }
+}
+
+void publishDiagnostics(CycleContext& context, uint64_t timestamp) {
+    for (size_t index = 0; index < context.diagnostic_channels.size(); ++index) {
+        if (!context.module->dartwic->upsertChannel(
+                context.diagnostic_channels[index], context.diagnostic_values[index], timestamp)) {
+            throw std::runtime_error("EtherCAT diagnostic publication was rejected.");
+        }
+    }
+}
+
 void publishFailureDiagnostics(CycleContext& context) noexcept {
-    if (context.diagnostic_values.size() < 4) return;
     context.diagnostic_values[0] = 0.0;
     context.diagnostic_values[1] = 0.0;
     context.diagnostic_values[2] = 0.0;
     context.diagnostic_values[3] = static_cast<double>(context.consecutive_failures);
     try {
-        context.module->dartwic->upsertFixedChannelValues(
-            context.diagnostic_channels, context.diagnostic_values, unixNanoseconds());
+        publishDiagnostics(context, unixNanoseconds());
     } catch (...) {
         // Diagnostics must never stop the reconnect loop.
+    }
+}
+
+void reportCycleFailure(CycleContext& context, const char* detail) noexcept {
+    const auto now = std::chrono::steady_clock::now();
+    if (context.last_failure_report.time_since_epoch().count() != 0 &&
+        now - context.last_failure_report < std::chrono::seconds(2)) return;
+    context.last_failure_report = now;
+    try {
+        context.module->dartwic->consoleError(
+            context.cycle_error_title, detail, context.cycle_error_channels,
+            "Check EtherCAT working counters, device state, and cyclic task diagnostics.",
+            0, 10.0);
+    } catch (...) {
+        // ARGUS admission must not stop the cyclic task.
     }
 }
 
@@ -239,7 +280,9 @@ void runCycle(DARTWIC::API::TaskRuntime& runtime) {
             validateMappings(*context);
         }
         if (!context->output_channels.empty()) {
-            api->queryFixedChannelValues(context->output_channels, context->output_values, 0.0);
+            for (size_t index = 0; index < context->output_channels.size(); ++index) {
+                context->output_values[index] = api->queryChannel(context->output_channels[index], 0.0);
+            }
             for (size_t i = 0; i < context->outputs.size(); ++i) {
                 const auto& mapping = context->outputs[i];
                 encodeValue(context->output_image, mapping.bit_offset, mapping.bit_length,
@@ -255,8 +298,7 @@ void runCycle(DARTWIC::API::TaskRuntime& runtime) {
                 mapping.bit_length, mapping.type, mapping.scale, mapping.offset);
         }
         if (!context->output_readback_channels.empty()) {
-            api->upsertFixedChannelValues(
-                context->output_readback_channels, context->output_readback_values, timestamp);
+            publishValues(api, context->output_readback_channels, context->output_readback_values, timestamp);
         }
         for (size_t i = 0; i < context->inputs.size(); ++i) {
             const auto& mapping = context->inputs[i];
@@ -264,23 +306,22 @@ void runCycle(DARTWIC::API::TaskRuntime& runtime) {
                 mapping.bit_length, mapping.type, mapping.scale, mapping.offset);
         }
         if (!context->input_channels.empty()) {
-            api->upsertFixedChannelValues(context->input_channels, context->input_values, timestamp);
+            publishValues(api, context->input_channels, context->input_values, timestamp);
         }
         context->consecutive_failures = 0;
-        context->diagnostic_values = {
-            static_cast<double>(status.exchange_duration_ns) / 1000.0,
-            static_cast<double>(status.actual_wkc),
-            static_cast<double>(status.expected_wkc),
-            0.0,
-        };
-        api->upsertFixedChannelValues(context->diagnostic_channels, context->diagnostic_values, timestamp);
+        context->diagnostic_values[0] = static_cast<double>(status.exchange_duration_ns) / 1000.0;
+        context->diagnostic_values[1] = static_cast<double>(status.actual_wkc);
+        context->diagnostic_values[2] = static_cast<double>(status.expected_wkc);
+        context->diagnostic_values[3] = 0.0;
+        publishDiagnostics(*context, timestamp);
     } catch (const std::exception& error) {
-        static_cast<void>(error);
         ++context->consecutive_failures;
         publishFailureDiagnostics(*context);
+        reportCycleFailure(*context, error.what());
     } catch (...) {
         ++context->consecutive_failures;
         publishFailureDiagnostics(*context);
+        reportCycleFailure(*context, "Unknown EtherCAT cyclic exchange failure.");
     }
 }
 
@@ -340,7 +381,7 @@ void EthercatPlugin::onPluginLoaded() {
         configureCycle(dartwic, runtime);
     };
     task.on_start = [this](const auto&, DARTWIC::API::TaskRuntime& runtime) {
-        runtime.setTypedRuntimeContext("ethercat.cycle", startCycle(dartwic, runtime));
+        startCycle(dartwic, runtime);
     };
     task.on_task = [](const auto&, DARTWIC::API::TaskRuntime& runtime, double) { runCycle(runtime); };
     task.on_end = [](const auto&, DARTWIC::API::TaskRuntime& runtime) { stopCycle(runtime); };
@@ -355,6 +396,10 @@ DARTWIC::Modules::BaseModule* EthercatPlugin::createModule(const std::string& mo
     return new EthercatModule(std::move(config), api);
 }
 } // namespace EtherCAT
+
+DARTWIC_PLUGIN_EXPORT uint32_t dartwicEngineSdkAbiVersion() noexcept {
+    return DARTWIC::Plugins::ENGINE_PLUGIN_SDK_ABI_VERSION;
+}
 
 DARTWIC_PLUGIN_EXPORT DARTWIC::Plugins::BasePlugin* createPlugin(
     nlohmann::json config,

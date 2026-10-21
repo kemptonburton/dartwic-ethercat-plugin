@@ -1,5 +1,6 @@
 import { createInterfacePlugin, definePlugin } from "./index.ts";
 import { setHostApi } from "./internal/host.ts";
+import {INTERFACE_PLUGIN_HOST_VERSION} from "./internal/versions.ts";
 import type { InterfacePluginDefinition, InterfacePluginHostApi } from "./types/index.ts";
 
 declare global {
@@ -19,6 +20,7 @@ export function registerPlugin(pluginDefinition: InterfacePluginDefinition) {
 
     const registry = (window.__dartwicPluginRegistry__ = window.__dartwicPluginRegistry__ || {});
     registry[pluginId] = {
+        internalHostVersion: INTERFACE_PLUGIN_HOST_VERSION,
         createPlugin(hostApi: InterfacePluginHostApi) {
             setHostApi(hostApi);
             return createInterfacePlugin(plugin);

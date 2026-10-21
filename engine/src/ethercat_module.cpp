@@ -15,6 +15,8 @@ EthercatModule::EthercatModule(nlohmann::json config, DARTWIC::API::SDK_API* api
         0.0, DARTWIC::API::ChannelStorage::Fixed);
     dartwic->upsertChannelField(channel, DARTWIC::API::ChannelField::UNITS,
         std::string{"bool"}, DARTWIC::API::ChannelStorage::Fixed);
+    dartwic->upsertChannelField(channel, DARTWIC::API::ChannelField::STALE_TIMEOUT,
+        3.0, DARTWIC::API::ChannelStorage::Fixed);
     connected_ = false;
 }
 
@@ -43,7 +45,8 @@ void EthercatModule::publishConnectionError(const std::string& message) noexcept
             message.empty() ? "Unable to exchange EtherCAT process data." : message,
             connection_error_channels_,
             "Verify that the selected adapter, EtherCAT network, and devices are available.",
-            0);
+            0,
+            10.0);
     } catch (...) {
         // Error reporting must never stop connection monitoring.
     }
@@ -189,6 +192,7 @@ dw_ec_exchange_status EthercatModule::exchange(std::span<const uint8_t> outputs,
         setConnected(true);
         return status;
     } catch (...) {
+        setConnected(false);
         // A cyclic task may lose an individual process-data frame without the
         // device disappearing. Leave connection ownership and recovery to the
         // independent connection monitor; the task runner reports this failed

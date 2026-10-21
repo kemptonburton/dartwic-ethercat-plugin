@@ -3,6 +3,7 @@
 #include "ethercat_bridge_loader.h"
 
 #include <sdk/modules/BaseModule.h>
+#include <sdk/discovery/DiscoveryResources.h>
 
 #include <algorithm>
 #include <cctype>
@@ -211,6 +212,13 @@ nlohmann::json buildDiscoveryCandidate(const nlohmann::json& adapter,
             {"arguments", {{"mappings", mappings}}},
         });
     }
+    const DARTWIC::API::DiscoveryResources module_resources{
+        .channels = {{"{instance}.info.connected", "Connection status", "input"}},
+    };
+    DARTWIC::API::DiscoveryResources cycle_resources;
+    for (const auto* suffix : {"exchange_time_us", "actual_wkc", "expected_wkc", "failure_count"}) {
+        cycle_resources.channels.push_back({std::string{"{instance}_cycle.ethercat."} + suffix, suffix, "input"});
+    }
     const auto adapter_name = adapterLabel(adapter);
     const auto process_image = topology.value("process_image", nlohmann::json::object());
     return {
@@ -236,6 +244,7 @@ nlohmann::json buildDiscoveryCandidate(const nlohmann::json& adapter,
         {"channels", std::move(channels)},
         {"provisioning", {
             {"module_type", "master"},
+            {"resources", module_resources.toJson()},
             {"suggested_instance_name", instance_name},
             {"parameters", {
                 {"adapter", adapter_id},
@@ -252,6 +261,7 @@ nlohmann::json buildDiscoveryCandidate(const nlohmann::json& adapter,
                     {"name_suffix", "_cycle"},
                     {"task_type", "cycle"},
                     {"argument_key", "mappings"},
+                    {"resources", cycle_resources.toJson()},
                 }})},
             }},
             {"tasks", std::move(tasks)},

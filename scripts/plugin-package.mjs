@@ -81,18 +81,11 @@ async function buildEngine(pluginId) {
     ]);
     return;
   }
-  await runCommand("cmake", [
-    "-S",
-    ".",
-    "-B",
-    "cmake-build-release",
-    "-DCMAKE_BUILD_TYPE=Release",
-  ]);
+  await runCommand("cmake", ["--preset", "linux-clang-release"]);
   await runCommand("cmake", [
     "--build",
-    "cmake-build-release",
-    "--config",
-    "Release",
+    "--preset",
+    "build-linux-clang-release",
     "--target",
     "copy_engine_plugin",
   ]);
@@ -112,18 +105,11 @@ async function buildEngineDebug(pluginId) {
     ]);
     return;
   }
-  await runCommand("cmake", [
-    "-S",
-    ".",
-    "-B",
-    "cmake-build-debug",
-    "-DCMAKE_BUILD_TYPE=Debug",
-  ]);
+  await runCommand("cmake", ["--preset", "linux-clang-debug"]);
   await runCommand("cmake", [
     "--build",
-    "cmake-build-debug",
-    "--config",
-    "Debug",
+    "--preset",
+    "build-linux-clang-debug",
     "--target",
     "copy_engine_plugin",
   ]);
