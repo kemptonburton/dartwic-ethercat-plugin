@@ -70,7 +70,7 @@ cmake --build --preset build-windows-clang-release --target copy_engine_plugin
 
 Set `VCPKG_ROOT` before using the presets. On Linux, use `linux-clang-release` and `build-linux-clang-release`.
 
-`npm run package` calls those native presets on Linux, builds the Interface side, and writes `plugin.zip` from a standalone checkout. Verify the KickCAT bridge's dynamic dependencies and NIC access on the target Linux host before controlling a slave chain.
+`npm run package` calls those native presets on Linux, builds the Interface side, and writes the current platform ZIP with both native configurations from a standalone checkout. Verify the KickCAT bridge's dynamic dependencies and NIC access on the target Linux host before controlling a slave chain.
 
 ## Build the KickCAT C bridge
 
@@ -136,3 +136,13 @@ EtherCAT® is a registered trademark and patented technology, licensed by Beckho
 Discovery uses the shared SDK resource descriptors: module connection status is listed under the module, while four cyclic diagnostics belong to the cyclic task. Editable PDO channel and state names use the shared channel picker; required diagnostic channels use checked, disabled rows. Review stays compact. The connection monitor is a shared plugin loop rather than a loop created per module. Channel name choices remain in the provisioning draft until Apply.
 
 The connection monitor republishes `{instance}.info.connected` each second, with a three-second stale timeout. A failed task exchange clears internal health so the monitor verifies again rather than retaining a recent successful state. Missing or stale observations appear as unknown in the shared Interface indicator.
+
+The specialized module page and connection icons are supplied by the Interface plugin. Deploy both the engine and Interface sides to their respective hosts; deploying only the native binary does not install the UI. Module pages use the shared host runtime overview and connection controls, matching the Modbus plugin while retaining device-specific settings. Reload an already-open Interface after a manual plugin-file deployment to clear cached missing-plugin results.
+
+## Release package contract
+
+Run `npm run package` on each supported native host. It must build both Release and Debug successfully before producing `plugin-win32-x64.zip` on Windows x64 or `plugin-linux-x64.zip` on Linux x64. Windows Debug PDB symbols are required. The ZIP includes `plugin/engine/ethercat/`, `plugin/engine-debug/ethercat/`, and `plugin/interface/ethercat/`; each contains the matching root `plugin.json`, native libraries live in each native tree's `bin/`, and the Interface entry point is `ui/index.js`. Configuration files, runtime dependencies, and optional `plugin/files/` content remain in the package.
+
+Upload the root `plugin.json` and one or both exact platform ZIPs to the same GitHub release; keep that manifest in the tagged source too. The tag, package, and every manifest must identify the same version. `release-manifest.json` provides generated SHA-256 checksums. Generic `plugin.zip` and separate debug ZIPs are not accepted. The Engine selects its OS and Release/Debug variant; it never falls back to a different OS.
+
+See the [example plugin's full release contract](https://github.com/kemptonburton/dartwic-example-plugin#github-release-contract) for the complete manifest shape and archive tree. Native packaging requires `VCPKG_ROOT`; optionally set `DARTWIC_VCPKG_INSTALLED_DIR` to reuse installed dependencies. Packaging does not deploy, push, or publish.

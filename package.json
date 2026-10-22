@@ -13,7 +13,7 @@
     "preversion": "node ./scripts/plugin-version.mjs --validate",
     "version": "node ./scripts/plugin-version.mjs",
     "package": "node ./scripts/plugin-package.mjs",
-    "package-debug": "node ./scripts/plugin-package.mjs --debug",
+    "package-debug": "node ./scripts/plugin-package.mjs",
     "deploy": "node ./scripts/plugin-deploy.mjs",
     "deploy-debug": "node ./scripts/plugin-deploy.mjs --debug",
     "deploy:engine-debug": "node ./scripts/plugin-deploy.mjs --engine-debug",

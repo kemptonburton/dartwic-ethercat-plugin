@@ -6,3 +6,6 @@ plugin.zip
 contributions.json
 deployment-settings.json
 bridge/CMakeUserPresets.json
+
+/plugin-*.zip
+/release-manifest.json
