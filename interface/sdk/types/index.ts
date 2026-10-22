@@ -132,6 +132,8 @@ export interface ValueFormatDefinition extends NamedContribution {
 
 /** Host services and shared component inventory supplied to a loaded interface plugin. @dartwic-reference @category Runtime */
 export interface InterfacePluginHostApi {
+    /** Read a UTF-8 file relative to an installed Interface plugin. Use assets/relative for bundled data, or createInterfacePluginAssetClient for validated asset-only reads. Missing/escaping files reject; updates replace bundled content. */
+    readPluginFile(pluginId: string, relativePath: string): Promise<string>;
     /** Optional local notification/issue services. Older hosts may not expose this capability. */
     notifications?: {createClient(source: string): import("../notifications/index.ts").LocalNotificationClient};
     React: Record<string, unknown>;

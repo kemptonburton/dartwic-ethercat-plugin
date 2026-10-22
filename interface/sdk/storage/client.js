@@ -5,7 +5,7 @@ function relativePath(value = '') {
     return path;
 }
 function projectName(value) {
-    if (!value || /[\\/:<>"|?*]/.test(value) || value === '.' || value === '..') throw new Error('Provide a valid project name.');
+    if (!value || value !== value.trim() || /[\\/:<>"|?*\x00-\x1f]/.test(value) || value.startsWith('.') || /[. ]$/.test(value) || /^(assets|global_data|node_modules|con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(value)) throw new Error('Provide a valid project name.');
     return value;
 }
 function reference(rootDir, path) { return {rootDir, path: relativePath(path)}; }

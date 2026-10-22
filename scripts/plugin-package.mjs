@@ -46,12 +46,7 @@ async function preparePluginOutput(pluginId, hasEngine, hasInterface) {
   await removePath(sidePaths.engineDebugDir);
   await removePath(sidePaths.interfaceDir);
 
-  const sourceFiles = path.resolve(repoRoot, "files");
-  const outputFiles = path.resolve(pluginOutputRoot, "files");
-  await removePath(outputFiles);
-  if (await pathExists(sourceFiles)) {
-    await copyDirectory(sourceFiles, outputFiles);
-  }
+
 }
 
 async function configureEngine(preset) {

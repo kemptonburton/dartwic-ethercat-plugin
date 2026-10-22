@@ -141,8 +141,18 @@ The specialized module page and connection icons are supplied by the Interface p
 
 ## Release package contract
 
-Run `npm run package` on each supported native host. It must build both Release and Debug successfully before producing `plugin-win32-x64.zip` on Windows x64 or `plugin-linux-x64.zip` on Linux x64. Windows Debug PDB symbols are required. The ZIP includes `plugin/engine/ethercat/`, `plugin/engine-debug/ethercat/`, and `plugin/interface/ethercat/`; each contains the matching root `plugin.json`, native libraries live in each native tree's `bin/`, and the Interface entry point is `ui/index.js`. Configuration files, runtime dependencies, and optional `plugin/files/` content remain in the package.
+Run `npm run package` on each supported native host. It must build both Release and Debug successfully before producing `plugin-win32-x64.zip` on Windows x64 or `plugin-linux-x64.zip` on Linux x64. Windows Debug PDB symbols are required. The ZIP includes `plugin/engine/ethercat/`, `plugin/engine-debug/ethercat/`, and `plugin/interface/ethercat/`; each contains the matching root `plugin.json`, native libraries live in each native tree's `bin/`, and the Interface entry point is `ui/index.js`. Required root configuration and runtime dependencies remain in the package; supporting files ship inside each plugin side's `assets/` directory.
 
 Upload the root `plugin.json` and one or both exact platform ZIPs to the same GitHub release; keep that manifest in the tagged source too. The tag, package, and every manifest must identify the same version. `release-manifest.json` provides generated SHA-256 checksums. Generic `plugin.zip` and separate debug ZIPs are not accepted. The Engine selects its OS and Release/Debug variant; it never falls back to a different OS.
 
 See the [example plugin's full release contract](https://github.com/kemptonburton/dartwic-example-plugin#github-release-contract) for the complete manifest shape and archive tree. Native packaging requires `VCPKG_ROOT`; optionally set `DARTWIC_VCPKG_INSTALLED_DIR` to reuse installed dependencies. Packaging does not deploy, push, or publish.
+
+## Asset ownership
+
+Managed files in this repository's `assets/` ship inside the installed plugin and
+are replaced with it. Keep custom shared files in
+`workspace/assets/plugins/<plugin-id>/` using the SDK helpers. Project settings
+remain project-scoped; local secrets and runtime data belong to Engine instances.
+Workspaces contain authored Git-trackable content; installed Engine and Interface
+directories contain replaceable software and local state. Plugin installation
+does not copy files into workspaces. See `assets/README.md` for the storage rules.

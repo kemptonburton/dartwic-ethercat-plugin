@@ -58,7 +58,7 @@ registerPlugin(plugin);
 
 Build output is `ui/index.js`. The live registry supplies installed-plugin contribution counts; packages contain no generated contribution metadata.
 
-Schematic node renderers and configuration UI are interface-owned. Place engine-readable palette JSON beneath `files/workspace/global_data/schematic_nodes/...`; installation mirrors it into the engine configuration root.
+Schematic node renderers and configuration UI are Interface-owned. Register plugin node contributions through the schematic-node APIs and bundle supporting files inside the plugin's `assets/`. User-authored shared palette JSON belongs in workspace `assets/schematic_nodes/`; plugin installation never writes into that authored directory.
 
 Public entrypoints include the main registry types, `assets`, `storage`, `tasks`, `resources`, `plugin-settings`, `module-configs`, `schematic-nodes`, `hooks`, `ui`, `utils`, `runtime`, `react`, and the Tailwind preset.
 
@@ -67,7 +67,7 @@ named-root file references, JSON helpers and workspace/project settings override
 See the hand-written [Storage and Settings guide](../../docs/Website/docs/Plugins/Storage%20and%20Settings.md)
 for location scopes, inheritance/reset examples, private module files and the 3D asset pattern.
 
-`createWorkspaceAssetClient(operation)` from `@dartwic/interface-sdk/assets` reads and saves reusable text/JSON packages beneath `workspace/global_data/assets/<namespace>/<filename>`. Media and 3D nodes use this same store. Use your plugin ID as the namespace, and keep portable references in configuration. See [Workspace Assets](../../docs/Design/99%20-%20Development%20Guides/Workspace%20Assets.md) for interface and engine examples, binary packaging, access rules and legacy compatibility.
+`createWorkspaceAssetClient(operation)` from `@dartwic/interface-sdk/assets` reads and saves reusable text/JSON packages beneath `workspace/assets/<namespace>/<filename>`. Media and 3D nodes use this same store. Prefer `createPluginWorkspaceAssetClient(operation, pluginId)` for shared authored files under `assets/plugins/<plugin-id>/`. Use `createBundledPluginAssetClient(pluginId)` to read managed Interface plugin assets after registration. Keep portable references in configuration; project settings and local runtime/secrets retain their existing scopes. See [Storage and Settings](../../docs/Website/docs/Plugins/Storage%20and%20Settings.md) for plugin storage and workspace asset usage.
 
 ## Stable resource identities
 
