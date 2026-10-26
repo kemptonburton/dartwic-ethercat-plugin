@@ -1,3 +1,4 @@
+import type {ConfigMapDefinition} from "../config-maps/index.ts";
 import type { ModuleConfigDefinition } from "../module-configs/types.ts";
 import type { PluginSettingsDefinition } from "../plugin-settings/types.ts";
 import type { ResourceDefinition } from "../resources/types.ts";
@@ -12,6 +13,8 @@ export interface NamedContribution {
 
 /** Registers task card and editor components under one task type. @dartwic-reference @category Tasks */
 export interface TaskUiDefinition extends NamedContribution {
+    /** Optional shared document declaration. An explicit editor owns its layout and can render multiple ConfigMap group views. */
+    configMap?: ConfigMapDefinition;
     card?: TaskCardDefinition["component"];
     editor?: TaskConfigDefinition["component"];
 }
@@ -32,10 +35,14 @@ export type ModuleConnectionDefinition = ModuleConnectionPresentation | ((contex
 
 /** Registers icon and panel components for a module type. @dartwic-reference @category Module Configuration */
 export interface ModuleUiDefinition extends NamedContribution {
+    /** Optional shared document declaration. An explicit panel owns its layout; omit panel for the automatic editor. */
+    configMap?: ConfigMapDefinition;
     icon?: (props: {className?: string; size?: number; "aria-hidden"?: boolean}) => any;
     panel?: ModuleConfigDefinition["component"];
     /** Opts this module type into shared live connection status presentation. */
     connection?: ModuleConnectionDefinition;
+    /** Host normalization metadata; the registrar sets this when an explicit panel accompanies configMap. */
+    customConfigMapLayout?: boolean;
 }
 
 /** Registers a resource type through the plugin registrar. @dartwic-reference @category Resources */
@@ -49,7 +56,11 @@ export interface SchematicNodeContributionDefinition extends Omit<SchematicNodeD
 
 /** Registers a plugin settings panel. @dartwic-reference @category Plugin Settings */
 export interface SettingsPanelDefinition extends NamedContribution {
-    component: PluginSettingsDefinition["component"];
+    /** Optional shared document declaration. An explicit component can interleave custom UI and ConfigMap group views. */
+    configMap?: ConfigMapDefinition;
+    component?: PluginSettingsDefinition["component"];
+    /** Host normalization metadata; set by the registrar for an explicit component with configMap. */
+    customConfigMapLayout?: boolean;
 }
 
 /** A named, host-modal workflow which receives one or more merge-compatible backend requests.  @dartwic-reference @category Plugin Registration */

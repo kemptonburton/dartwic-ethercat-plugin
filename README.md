@@ -27,6 +27,15 @@ No C++ objects cross the compiler boundary. The public bridge interface is `engi
 
 One `ethercat.cycle` task exclusively owns one `ethercat.master` module while running. Reads and writes occur in the same EtherCAT frame cycle. There are no per-channel network operations, background command queues, or change-detection delays in the hot path.
 
+Each start uses `setChannel` to make input measurements, output readbacks, and
+diagnostics observe-only. Cycles publish through fixed handles under that
+authority; command inputs stay writable. Completed stop releases ownership.
+Configuration creates channels without claiming or resetting their observations.
+Stop retains the prepared cycle context for a subsequent start; task cleanup
+releases it when the task is removed or replaced.
+An output's `_state` reports its transmitted PDO image after a successful exchange;
+physical device feedback must be mapped separately from the input process image.
+
 Configuration retains fixed channel and diagnostic handles, PDO mappings, and
 numeric buffers. At task start, an already connected process image is sized and
 validated before cyclic exchange. A later connection or changed topology can

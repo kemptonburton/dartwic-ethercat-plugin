@@ -35,6 +35,9 @@ export interface TaskConfigProps {
 
 /** Task type and component registered as a configuration editor. @dartwic-reference @category Tasks */
 export interface TaskConfigDefinition {
+    configMap?: import("../config-maps/index.ts").ConfigMapDefinition;
+    /** Host normalization metadata; set by the registrar for an explicit editor with configMap. */
+    customConfigMapLayout?: boolean;
     taskType: string;
     component: TaskComponent;
 }

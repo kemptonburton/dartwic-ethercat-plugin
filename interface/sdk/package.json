@@ -28,6 +28,7 @@
     "./ui": "./ui/index.ts",
     "./ui/dartwic": "./ui/dartwic.ts",
     "./ui/general": "./ui/general.ts",
-    "./utils": "./utils/index.ts"
+    "./utils": "./utils/index.ts",
+    "./config-maps": "./config-maps/index.ts"
   }
 }

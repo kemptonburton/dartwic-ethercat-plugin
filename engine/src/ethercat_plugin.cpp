@@ -65,13 +65,6 @@ void createFixedChannel(DARTWIC::API::SDK_API* api, const std::string& channel, 
     (void)api->createFixedChannel(channel, initial);
 }
 
-void createObservedChannel(DARTWIC::API::SDK_API* api,
-    const std::string& channel,
-    double initial = 0.0) {
-    createFixedChannel(api, channel, initial);
-    api->setChannel(channel, DARTWIC::API::ChannelValue{initial});
-}
-
 std::vector<Mapping> parseMappings(const nlohmann::json& arguments) {
     if (!arguments.contains("mappings") || !arguments.at("mappings").is_array()) return {};
     std::vector<Mapping> mappings;
@@ -141,20 +134,20 @@ void configureCycle(DARTWIC::API::SDK_API* api, DARTWIC::API::TaskRuntime& runti
     for (const auto& mapping : mappings) {
         if (mapping.channel_to_device) {
             createFixedChannel(module->dartwic, mapping.channel);
-            createObservedChannel(module->dartwic, mapping.readback_channel);
+            createFixedChannel(module->dartwic, mapping.readback_channel);
             fixed_inputs.push_back(mapping.channel);
         } else {
-            createObservedChannel(module->dartwic, mapping.channel);
+            createFixedChannel(module->dartwic, mapping.channel);
         }
     }
     runtime.setFixedInputChannels(std::move(fixed_inputs));
-    createObservedChannel(module->dartwic,
+    createFixedChannel(module->dartwic,
         diagnosticChannel(runtime.getTaskName(), "exchange_time_us"));
-    createObservedChannel(module->dartwic,
+    createFixedChannel(module->dartwic,
         diagnosticChannel(runtime.getTaskName(), "actual_wkc"));
-    createObservedChannel(module->dartwic,
+    createFixedChannel(module->dartwic,
         diagnosticChannel(runtime.getTaskName(), "expected_wkc"));
-    createObservedChannel(module->dartwic,
+    createFixedChannel(module->dartwic,
         diagnosticChannel(runtime.getTaskName(), "failure_count"));
     auto context = std::make_shared<CycleContext>();
     context->task_name = runtime.getTaskName();
@@ -330,7 +323,6 @@ void stopCycle(DARTWIC::API::TaskRuntime& runtime) noexcept {
     if (context && context->module) {
         context->module->stop(context->task_name);
     }
-    runtime.removeRuntimeContext("ethercat.cycle");
 }
 } // namespace
 
@@ -385,7 +377,10 @@ void EthercatPlugin::onPluginLoaded() {
     };
     task.on_task = [](const auto&, DARTWIC::API::TaskRuntime& runtime, double) { runCycle(runtime); };
     task.on_end = [](const auto&, DARTWIC::API::TaskRuntime& runtime) { stopCycle(runtime); };
-    task.cleanup = stopCycle;
+    task.cleanup = [](DARTWIC::API::TaskRuntime& runtime) {
+        stopCycle(runtime);
+        runtime.removeRuntimeContext("ethercat.cycle");
+    };
     dartwic->registerTaskType("cycle", "EtherCAT Cyclic I/O", std::move(task));
 }
 

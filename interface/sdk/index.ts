@@ -1,3 +1,5 @@
+import React from './react.ts';
+import {ConfigMap} from './config-maps/index.ts';
 import type {
     InterfaceContributionEntry,
     InterfaceContributions,
@@ -94,19 +96,26 @@ function materializePlugin(definition: InterfacePluginDefinition): MaterializedI
         },
         addTaskUi(value: TaskUiDefinition) {
             const id = addEntry("taskUis", value.id, value.name);
-            if (!value.card && !value.editor) {
+            if (!value.card && !value.editor && !value.configMap) {
                 throw new Error(`Task UI '${id}' must provide a card or editor component.`);
             }
             if (value.card) taskCards[id] = {taskType: id, component: value.card};
-            if (value.editor) taskEditors[id] = {taskType: id, component: value.editor};
+            const editor = value.editor ?? (value.configMap ? (props: any) => (React as any).createElement(ConfigMap, {
+                definition: value.configMap, resourceKey: `task:${props.task.name}`, context: props,
+            }) : null);
+            if (editor) taskEditors[id] = {taskType: id, component: editor, configMap: value.configMap,
+                customConfigMapLayout: Boolean(value.configMap && value.editor)};
             return id;
         },
         addModuleUi(value: ModuleUiDefinition) {
             const id = addEntry("moduleUis", value.id, value.name);
-            if (!value.icon && !value.panel) {
+            if (!value.icon && !value.panel && !value.configMap) {
                 throw new Error(`Module UI '${id}' must provide an icon or panel component.`);
             }
-            moduleUis[id] = {...value, id};
+            const panel = value.panel ?? (value.configMap ? (props: any) => (React as any).createElement(ConfigMap, {
+                definition: value.configMap, resourceKey: `module:${props.instanceConfig.name}`, context: props,
+            }) : undefined);
+            moduleUis[id] = {...value, id, panel, customConfigMapLayout: Boolean(value.configMap && value.panel)};
             return id;
         },
         addResource(value: ResourceContributionDefinition) {
@@ -135,7 +144,11 @@ function materializePlugin(definition: InterfacePluginDefinition): MaterializedI
         },
         addSettingsPanel(value: SettingsPanelDefinition) {
             const id = addEntry("settingsPanels", value.id, value.name);
-            settingsPanels.push({...value, id});
+            const component = value.component ?? (value.configMap ? (props: any) => (React as any).createElement(ConfigMap, {
+                definition: value.configMap, resourceKey: `plugin:${pluginId}:${value.id}`, context: props,
+            }) : null);
+            if (!component) throw new Error(`Settings panel '${id}' must provide a component or configMap.`);
+            settingsPanels.push({...value, id, component, customConfigMapLayout: Boolean(value.configMap && value.component)});
             return id;
         },
         addPopupUi(value: PopupUiDefinition) {
