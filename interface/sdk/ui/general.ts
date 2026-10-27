@@ -316,6 +316,8 @@ export const Tooltip = createHostComponent<TooltipProps>("Tooltip", (hostApi) =>
 export const TooltipContent = createHostComponent<TooltipContentProps>("TooltipContent", (hostApi) => hostApi.components.TooltipContent);
 /** Tooltip Trigger using the host's short contextual help presentation. @dartwic-reference @category UI Components */
 export const TooltipTrigger = createHostComponent<TooltipTriggerProps>("TooltipTrigger", (hostApi) => hostApi.components.TooltipTrigger);
+/** Config Map using the host's shared configuration editing presentation. @dartwic-reference @category UI Components */
+export const ConfigMap = createHostComponent<HostComponentProps>("ConfigMap", (hostApi) => hostApi.components.ConfigMap);
 /** Formatted Value Input using the host's formatted numeric editing presentation. @dartwic-reference @category UI Components */
 export const FormattedValueInput = createHostComponent<FormattedValueInputProps>("FormattedValueInput", (hostApi) => hostApi.components.FormattedValueInput);
 /** Formatted Value Control using the host's formatted numeric editing presentation. @dartwic-reference @category UI Components */
