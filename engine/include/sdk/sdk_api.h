@@ -18,6 +18,7 @@
 #include "plugins/InternalVersions.h"
 
 namespace TEMPEST { class Transport; class Peer; }
+namespace DARTWIC { class EngineProtocol; }
 
 namespace DARTWIC::Modules {
     class BaseModule;
@@ -383,11 +384,29 @@ namespace DARTWIC::API {
         std::string name;
         uint64_t version = 1;
         nlohmann::json default_config = nlohmann::json::object();
-        std::string protocol_id = "tempest.peer";
-        uint64_t protocol_version = 1;
-        bool engine_protocol = false;
-        std::function<TransportPtr(const nlohmann::json& config)> create;
-        std::function<void(TEMPEST::Peer& peer)> configure;
+        std::string protocol_id = "tempest.engine";
+        uint64_t protocol_version = DARTWIC::Plugins::TEMPEST_COMPATIBILITY_VERSION;
+        bool engine_protocol = true;
+        std::function<TransportPtr(const nlohmann::json&, TEMPEST::Peer&, DARTWIC::EngineProtocol&)> create;
+        std::function<void(TEMPEST::Peer&)> configure;
+        // Host-normalized transport-only registration. Use registerPeerTransport.
+        std::function<TransportPtr(const nlohmann::json&)> create_transport;
+    };
+
+    /** A custom link carrying DARTWIC messages. Engine creates Peer and protocol.
+     * @dartwic-reference
+     * @category TEMPEST
+     */
+    struct PeerTransportDefinition {
+        std::string id;
+        std::string name;
+        uint64_t version = 1;
+        nlohmann::json default_config = nlohmann::json::object();
+        std::string protocol_id = "tempest.engine";
+        uint64_t protocol_version = DARTWIC::Plugins::TEMPEST_COMPATIBILITY_VERSION;
+        bool engine_protocol = true;
+        std::function<TransportPtr(const nlohmann::json&)> create;
+        std::function<void(TEMPEST::Peer&)> configure;
     };
 
     /**
@@ -533,6 +552,24 @@ namespace DARTWIC::API {
          * @returns The plugin-qualified peer ID used by tempest/peers/connect.
          */
         virtual std::string registerPeer(PeerDefinition definition) = 0;
+
+        /** Register a transport carrying DARTWIC messages to another peer. The
+         * Engine supplies identity, registration and application protocol.
+         * @dartwic-reference
+         * @category TEMPEST
+         * @param definition Connection label, default settings, and transport factory.
+         * @returns The plugin-qualified transport identifier.
+         */
+        virtual std::string registerPeerTransport(PeerTransportDefinition definition) {
+            PeerDefinition peer;
+            peer.id=std::move(definition.id);peer.name=std::move(definition.name);
+            peer.version=definition.version;peer.default_config=std::move(definition.default_config);
+            peer.protocol_id=std::move(definition.protocol_id);peer.protocol_version=definition.protocol_version;
+            peer.engine_protocol=definition.engine_protocol;peer.create_transport=std::move(definition.create);
+            peer.configure=std::move(definition.configure);
+            return registerPeer(std::move(peer));
+        }
+
         /**
          * Registers a plugin-local task type and returns its qualified identifier.
          * @dartwic-reference
@@ -705,13 +742,6 @@ namespace DARTWIC::API {
          * @param value Optional value; omitting it preserves the current numeric value.
          */
         virtual void setChannel(const std::string& channel, std::optional<ChannelValue> value = std::nullopt) = 0;
-        /**
-         * Compatibility alias for value-free commandChannel; new code should use commandChannel.
-         * @dartwic-reference
-         * @category Channel Authority
-         * @param channel Flat channel name.
-         */
-        virtual void claimChannel(const std::string& channel) = 0;
         /**
          * Releases all of the local caller's claims without writing a value.
          * Other controllers and operator control remain. No eligible caller or remote target is a no-op.
@@ -1085,18 +1115,12 @@ namespace DARTWIC::API {
             applyAuthorityByHandle(3, channel, std::move(value));
         }
 
-        // Unique virtual names are essential on the Microsoft ABI: adding a
-        // virtual overload would regroup and move existing overload slots.
-        /** @dartwic-reference-exclude Internal compatibility dispatch; use the four authority operations. */
+        /** @dartwic-reference-exclude Host authority dispatch; use the four authority operations. */
         virtual void applyAuthorityByName(uint32_t operation, const std::string& channel,
-            std::optional<ChannelValue> value) {
-            throw std::runtime_error("Authority operation requires Engine 2.0.7 or newer.");
-        }
-        /** @dartwic-reference-exclude Internal compatibility dispatch; use fixed-handle authority operations. */
+            std::optional<ChannelValue> value) = 0;
+        /** @dartwic-reference-exclude Host authority dispatch; use fixed-handle authority operations. */
         virtual void applyAuthorityByHandle(uint32_t operation, const FixedChannelHandle& channel,
-            std::optional<ChannelValue> value) {
-            throw std::runtime_error("Fixed-channel authority requires Engine 2.0.7 or newer.");
-        }
+            std::optional<ChannelValue> value) = 0;
 
     };
 

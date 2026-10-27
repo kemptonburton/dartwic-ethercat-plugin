@@ -34,8 +34,9 @@ template<class T> std::shared_ptr<T> taskModule(SDK_API* api, const TaskRuntime&
     return module;
 }
 
-/** Plugin-owned, configuration-only task/module association helper. bind wraps
- * existing configure/cleanup callbacks without changing SDK ABI. Limits count
+/** Plugin-owned, configuration-only task/module association helper.
+ *
+ * bind wraps existing configure/cleanup callbacks without changing SDK ABI. Limits count
  * configured tasks, including stopped ones. Claims commit after successful
  * preparation and release on task destruction; ordinary cycles never enter it.
  * Device access remains synchronized by the module. @dartwic-reference @category Modules */
