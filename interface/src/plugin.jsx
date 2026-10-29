@@ -1,6 +1,6 @@
 import {definePlugin} from "../sdk/index.ts";
 import React from "../sdk/react.ts";
-import {moduleMap, cycleMap, EthercatConfigLayout} from './configMaps.jsx';
+import {moduleMap, cycleMap, pluginMap, EthercatConfigLayout} from './configMaps.jsx';
 import {EthercatTaskCard} from "./taskCards.jsx";
 
 function EthercatIcon(props) {
@@ -14,6 +14,7 @@ export default definePlugin({
     id: "ethercat",
     name: "EtherCAT",
     register(registry) {
+        registry.addSettingsPanel({id: "discovery", name: "Discovery", configMap: pluginMap});
         registry.addTaskUi({id: "cycle", name: "EtherCAT Cyclic I/O", card: EthercatTaskCard, configMap: cycleMap, editor: EthercatConfigLayout});
         registry.addModuleUi({
             id: "master",

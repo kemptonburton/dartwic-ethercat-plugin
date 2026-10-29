@@ -4,6 +4,10 @@ High-speed cyclic EtherCAT I/O for DARTWIC 2.0. The plugin runs one synchronous,
 
 The repository is standalone and does not contain or require the private DARTWIC source tree. Versioned Engine and Interface SDK snapshots are bundled for plugin development.
 
+## Discovery settings
+
+Open the plugin's **Discovery** settings or its **Config Map** sheet in Channel Search to set discovery enablement, scan interval, adapter IDs, discovery and suggested-cycle receive timeouts, task suggestions, and the channel suggestion limit. Leave adapter IDs empty to scan all eligible adapters, or enter a comma-separated list. Both views edit the same workspace settings. Saved discovery changes require an Engine restart. Existing project overrides must be removed before editing the corresponding workspace setting here.
+
 ## Architecture
 
 The runtime is intentionally split at a C ABI boundary:

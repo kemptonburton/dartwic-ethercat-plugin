@@ -2,6 +2,22 @@ import React from '../sdk/react.ts';
 import {defineConfigMap, createModuleConfigAdapter, createTaskConfigAdapter, ConfigMap} from '../sdk/config-maps/index.ts';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '../sdk/ui/general.ts';
 import {ComboboxSearch, ManualRefreshButton} from '../sdk/ui/dartwic.ts';
+import {createDiscoverySettingsAdapter} from './discoverySettings.js';
+
+export const pluginMap = defineConfigMap({
+    ...createDiscoverySettingsAdapter('ethercat'), title: 'EtherCAT discovery settings',
+    groups: [{id: 'discovery', label: 'Device discovery · Engine restart required', fields: [
+        {path: 'device_discovery.enabled', label: 'Device discovery', type: 'toggle', defaultValue: true},
+        {path: 'device_discovery.scan_interval_seconds', label: 'Scan interval (seconds)', type: 'number', required: true, integer: true, min: 1, max: 300, defaultValue: 5},
+        {path: 'device_discovery.adapter_ids', label: 'Adapter IDs', type: 'text', defaultValue: [], placeholder: 'All adapters',
+            description: 'Comma-separated adapter IDs. Leave empty to discover on all eligible adapters.',
+            parse: raw => raw.split(',').map(value => value.trim()).filter(Boolean)},
+        {path: 'device_discovery.receive_timeout_us', label: 'Discovery receive timeout (µs)', type: 'number', required: true, integer: true, min: 50, max: 5000000, defaultValue: 100000},
+        {path: 'device_discovery.cycle_receive_timeout_us', label: 'Suggested cycle receive timeout (µs)', type: 'number', required: true, integer: true, min: 50, max: 100000, defaultValue: 10000},
+        {path: 'device_discovery.create_cycle_task', label: 'Suggest cyclic I/O task', type: 'toggle', defaultValue: true},
+        {path: 'device_discovery.maximum_suggested_channels', label: 'Maximum suggested channels', type: 'number', required: true, integer: true, min: 1, max: 4096, defaultValue: 512},
+    ]}],
+});
 
 function payload(result) {
     if (!result || result.error) throw new Error(result?.payload?.error || 'EtherCAT operation failed.');

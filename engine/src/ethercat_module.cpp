@@ -40,7 +40,7 @@ void EthercatModule::publishConnectionState() noexcept {
 
 void EthercatModule::publishConnectionError(const std::string& message) noexcept {
     try {
-        dartwic->consoleError(
+        dartwic->error(
             connection_error_title_,
             message.empty() ? "Unable to exchange EtherCAT process data." : message,
             connection_error_channels_,

@@ -250,7 +250,7 @@ void reportCycleFailure(CycleContext& context, const char* detail) noexcept {
         now - context.last_failure_report < std::chrono::seconds(2)) return;
     context.last_failure_report = now;
     try {
-        context.module->dartwic->consoleError(
+        context.module->dartwic->error(
             context.cycle_error_title, detail, context.cycle_error_channels,
             "Check EtherCAT working counters, device state, and cyclic task diagnostics.",
             0, 10.0);
