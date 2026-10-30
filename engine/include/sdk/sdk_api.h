@@ -90,6 +90,8 @@ namespace DARTWIC::API {
 
     /**
      * Controls when channel values are recorded to persistence.
+     * EveryValueExcludeAutorecord records every accepted sample (including equal
+     * values and timestamped batches) and skips periodic snapshots; requires Engine 2.1.0.
      *
      * @dartwic-reference
      * @category Channels
@@ -97,7 +99,8 @@ namespace DARTWIC::API {
     enum class RecordMode {
         OnValueChange,
         Never,
-        EveryValue
+        EveryValue,
+        EveryValueExcludeAutorecord
     };
 
     /**

@@ -5,7 +5,7 @@
   "author": "Kempton Burton",
   "version": "2.1.0",
   "minEngineVersion": "2.1.0",
-  "minInterfaceVersion": "2.0.12",
+  "minInterfaceVersion": "2.1.0",
   "contains_engine_plugin": true,
   "contains_interface_plugin": true,
   "device_discovery": {
