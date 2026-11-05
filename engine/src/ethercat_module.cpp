@@ -11,10 +11,11 @@ EthercatModule::EthercatModule(nlohmann::json config, DARTWIC::API::SDK_API* api
       connection_error_title_("ETHERCAT CONNECTION ERROR [" + instance_name_ + "]"),
       connection_error_channels_{connected_channel_} {
     const auto& channel = connected_channel_;
-    dartwic->upsertChannelField(channel, DARTWIC::API::ChannelField::VALUE,
-        0.0, DARTWIC::API::ChannelStorage::Fixed);
-    dartwic->upsertChannelField(channel, DARTWIC::API::ChannelField::UNITS,
+    // Seed new channels only; module reload must preserve the monitor's sample,
+    // units and authority on an existing connection channel.
+    dartwic->insertChannelField(channel, DARTWIC::API::ChannelField::UNITS,
         std::string{"bool"}, DARTWIC::API::ChannelStorage::Fixed);
+    (void)dartwic->createFixedChannel(channel, 0.0);
     dartwic->upsertChannelField(channel, DARTWIC::API::ChannelField::STALE_TIMEOUT,
         3.0, DARTWIC::API::ChannelStorage::Fixed);
     connected_ = false;

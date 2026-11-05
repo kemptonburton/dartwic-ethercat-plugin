@@ -52,6 +52,14 @@ firing separation; local admission is limited to one report per 2 seconds.
 
 ## Configuration
 
+Applying module settings reconstructs the connection using the same module name.
+Initialization creates Boolean status-channel units only when the channel is
+missing and reuses existing fixed storage without resetting its value or taking
+its monitor's control. The connection loop publishes the replacement connection's
+health normally. Existing names and task mappings remain intact; no Engine
+permission changes are needed. The three-second stale timeout is unchanged.
+A new module name creates a separate status channel.
+
 The engine automatically scans every Npcap-visible adapter that is not already assigned to an EtherCAT Master module. When a slave chain responds, DARTWIC opens the standard device-found notification with:
 
 - one suggested EtherCAT Master module for the adapter;
