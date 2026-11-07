@@ -17,7 +17,9 @@ namespace {
 using LibraryHandle = HMODULE;
 
 LibraryHandle openLibrary(const std::filesystem::path& path) {
-    return LoadLibraryW(path.c_str());
+    const auto absolute_path = std::filesystem::absolute(path).make_preferred();
+    return LoadLibraryExW(absolute_path.c_str(), nullptr,
+        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
 }
 
 void closeLibrary(LibraryHandle handle) {
@@ -141,8 +143,10 @@ BridgeLibrary::BridgeLibrary(const std::filesystem::path& explicit_path)
     : api_(std::make_unique<Api>()) {
     const auto path = explicit_path.empty() ? defaultBridgePath() : explicit_path;
     api_->library = openLibrary(path);
-    if (api_->library == nullptr) throw std::runtime_error(
-        "Unable to load EtherCAT bridge `" + path.string() + "`: " + platformError());
+    if (api_->library == nullptr) {
+        const auto error = platformError();
+        throw std::runtime_error("Unable to load EtherCAT bridge `" + path.string() + "`: " + error);
+    }
 
     api_->abi_version = requireSymbol<decltype(api_->abi_version)>(api_->library, "dw_ec_bridge_abi_version");
     api_->list_adapters = requireSymbol<decltype(api_->list_adapters)>(api_->library, "dw_ec_list_adapters_json");

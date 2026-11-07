@@ -125,6 +125,10 @@ export const moduleMap = defineConfigMap({...createModuleConfigAdapter(), title:
 export const cycleMap = defineConfigMap({...createTaskConfigAdapter(), title: 'EtherCAT cyclic I/O', groups: [
     {id: 'configuration', label: 'Task configuration', fields: [
         {path: 'arguments.module_instance_name', label: 'Module connection', type: 'module', pluginId: 'ethercat', moduleTypeIds: ['master'], required: true},
+        {path: 'arguments.auto_set_stale_timeout', label: 'Auto-set stale timeout', type: 'toggle', defaultValue: true,
+            description: 'Apply to mapped PDO telemetry and output state. Turn off to edit channel timeouts manually.'},
+        {path: 'arguments.stale_timeout_seconds', label: 'Stale timeout (seconds)', type: 'number', required: true, defaultValue: 2,
+            validate: value => value > 0 ? '' : 'Enter a positive stale timeout in seconds.'},
     ]}, {id: 'bindings', label: 'PDO mappings', tables: [{path: 'arguments.mappings', label: 'PDO mappings', createRow: () => ({direction: 'channel_to_device', scale: 1, offset: 0}), columns: [
         {path: 'direction', label: 'Direction', type: 'select', required: true, options: [{value: 'channel_to_device', label: 'Command'}, {value: 'device_to_channel', label: 'Telemetry'}],
             render: props => <DirectionCell {...props}/>},
@@ -138,7 +142,6 @@ export const cycleMap = defineConfigMap({...createTaskConfigAdapter(), title: 'E
     ]}]},
 ], validate(document) {
     const rows = document.arguments?.mappings || [];
-    if (!rows.length) return 'Add at least one PDO mapping.';
     for (const row of rows) {
         if (!row.bit_length || row.bit_length > 64) return 'Select a PDO entry with a bit length from 1 to 64.';
         if (row.direction === 'channel_to_device' && (row.readback_channel === row.channel || row.readback_channel === ''))

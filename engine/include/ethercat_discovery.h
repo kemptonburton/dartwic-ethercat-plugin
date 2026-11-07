@@ -12,6 +12,8 @@
 #include <unordered_set>
 
 namespace EtherCAT {
+    class BridgeLibrary;
+
     nlohmann::json buildDiscoveryCandidate(
         const nlohmann::json& adapter,
         const nlohmann::json& topology,
@@ -22,6 +24,7 @@ namespace EtherCAT {
     class EthercatDeviceFinder {
     public:
         EthercatDeviceFinder(DARTWIC::API::SDK_API* api, const nlohmann::json& plugin_config);
+        ~EthercatDeviceFinder();
 
         void tick();
         nlohmann::json settings() const;
@@ -45,6 +48,7 @@ namespace EtherCAT {
         size_t maximum_suggested_channels_{512};
         std::chrono::seconds scan_interval_{5};
         std::chrono::steady_clock::time_point next_scan_{};
+        std::unique_ptr<BridgeLibrary> discovery_bridge_;
         std::future<nlohmann::json> scan_future_;
         bool scan_in_progress_{false};
         nlohmann::json last_adapters_ = nlohmann::json::array();

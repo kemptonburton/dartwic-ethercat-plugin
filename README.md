@@ -107,6 +107,8 @@ Windows requires the MSYS2 UCRT64 GCC, CMake, Ninja, and Python packages. The sc
 
 Npcap must be installed on a target Windows machine. The bridge loads Npcap at runtime so a missing installation produces a useful adapter error rather than preventing DARTWIC from loading the plugin. Npcap runtime binaries are not checked into this open-source repository because redistribution requires an [Npcap OEM license](https://nmap.org/npcap/oem/).
 
+Discovery loads the bridge on demand and reuses it for subsequent scans. Each scan still enumerates the current adapters. The discovery finder waits for its active scan before releasing the bridge at shutdown.
+
 ## TwinCAT EtherCAT simulation
 
 Use an external SubDevice simulator when testing the complete NIC, packet-driver, and wire path. [Beckhoff TE1111 TwinCAT 3 EtherCAT Simulation](https://www.beckhoff.com/en-en/products/automation/twinsafe/twinsafe-software/te1111.html) is the recommended Windows option and is available in TwinCAT for demo testing.

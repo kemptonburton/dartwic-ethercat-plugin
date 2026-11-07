@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -59,10 +60,6 @@ struct CycleContext {
 
 std::string diagnosticChannel(const std::string& task, const char* suffix) {
     return task + ".ethercat." + suffix;
-}
-
-void createFixedChannel(DARTWIC::API::SDK_API* api, const std::string& channel, double initial = 0.0) {
-    (void)api->createFixedChannel(channel, initial);
 }
 
 std::vector<Mapping> parseMappings(const nlohmann::json& arguments) {
@@ -129,46 +126,40 @@ void configureCycle(DARTWIC::API::SDK_API* api, DARTWIC::API::TaskRuntime& runti
     if (instance.empty()) throw std::runtime_error("ethercat.cycle requires module_instance_name.");
     auto module = moduleFor(api, instance);
     const auto mappings = parseMappings(arguments);
-
-    std::vector<std::string> fixed_inputs;
-    for (const auto& mapping : mappings) {
-        if (mapping.channel_to_device) {
-            createFixedChannel(module->dartwic, mapping.channel);
-            createFixedChannel(module->dartwic, mapping.readback_channel);
-            fixed_inputs.push_back(mapping.channel);
-        } else {
-            createFixedChannel(module->dartwic, mapping.channel);
-        }
+    const bool auto_set_timeout = arguments.value("auto_set_stale_timeout", true);
+    const double stale_timeout = auto_set_timeout ? arguments.value("stale_timeout_seconds", 2.0) : 0.0;
+    if (auto_set_timeout && (!std::isfinite(stale_timeout) || stale_timeout <= 0.0)) {
+        throw std::runtime_error("Stale timeout must be a positive number of seconds.");
     }
-    runtime.setFixedInputChannels(std::move(fixed_inputs));
-    createFixedChannel(module->dartwic,
-        diagnosticChannel(runtime.getTaskName(), "exchange_time_us"));
-    createFixedChannel(module->dartwic,
-        diagnosticChannel(runtime.getTaskName(), "actual_wkc"));
-    createFixedChannel(module->dartwic,
-        diagnosticChannel(runtime.getTaskName(), "expected_wkc"));
-    createFixedChannel(module->dartwic,
-        diagnosticChannel(runtime.getTaskName(), "failure_count"));
+    auto* module_api = module->dartwic;
+    const auto configure_output = [&](const std::string& channel) {
+        auto handle = module_api->createFixedChannel(channel);
+        if (auto_set_timeout) module_api->upsertChannelField(channel, ChannelField::STALE_TIMEOUT,
+            stale_timeout, ChannelStorage::Fixed);
+        return handle;
+    };
     auto context = std::make_shared<CycleContext>();
     context->task_name = runtime.getTaskName();
     context->cycle_error_title = "ETHERCAT CYCLE ERROR [" + instance + "]";
     context->module = std::move(module);
+    std::vector<std::string> fixed_inputs;
     for (auto mapping : mappings) {
         if (mapping.channel_to_device) {
-            context->output_channels.push_back(context->module->dartwic->createFixedChannel(mapping.channel));
-            context->output_readback_channels.push_back(
-                context->module->dartwic->createFixedChannel(mapping.readback_channel));
+            fixed_inputs.push_back(mapping.channel);
+            context->output_channels.push_back(module_api->createFixedChannel(mapping.channel));
+            context->output_readback_channels.push_back(configure_output(mapping.readback_channel));
             context->outputs.push_back(std::move(mapping));
         } else {
-            context->input_channels.push_back(context->module->dartwic->createFixedChannel(mapping.channel));
+            context->input_channels.push_back(configure_output(mapping.channel));
             context->inputs.push_back(std::move(mapping));
         }
     }
+    runtime.setFixedInputChannels(std::move(fixed_inputs));
     for (const auto& mapping : context->inputs) context->cycle_error_channels.push_back(mapping.channel);
     constexpr std::array<const char*, 4> suffixes = {
         "exchange_time_us", "actual_wkc", "expected_wkc", "failure_count"};
     for (size_t index = 0; index < suffixes.size(); ++index) {
-        context->diagnostic_channels[index] = context->module->dartwic->createFixedChannel(
+        context->diagnostic_channels[index] = module_api->createFixedChannel(
             diagnosticChannel(context->task_name, suffixes[index]));
     }
     context->output_values.resize(context->outputs.size());
@@ -367,6 +358,7 @@ void EthercatPlugin::onPluginLoaded() {
     task.metadata.icon_url = ethercat_icon;
     task.metadata.default_arguments = {
         {"module_instance_name", ""},
+        {"auto_set_stale_timeout", true}, {"stale_timeout_seconds", 2.0},
         {"mappings", nlohmann::json::array()},
     };
     task.on_configure = [this](const auto&, DARTWIC::API::TaskRuntime& runtime) {

@@ -75,10 +75,10 @@ std::string channelName(const std::string& instance_name,
         objectAddress(entry);
 }
 
-nlohmann::json scanEthercatBuses(const std::unordered_set<std::string>& configured_adapters,
+nlohmann::json scanEthercatBuses(const BridgeLibrary& bridge,
+    const std::unordered_set<std::string>& configured_adapters,
     const std::unordered_set<std::string>& allowed_adapters,
     int receive_timeout_us) {
-    BridgeLibrary bridge;
     const auto adapters = bridge.listAdapters();
     auto buses = nlohmann::json::array();
     auto errors = nlohmann::json::array();
@@ -288,6 +288,10 @@ EthercatDeviceFinder::EthercatDeviceFinder(DARTWIC::API::SDK_API* api,
         discovery.value("scan_interval_seconds", 5), 1, 300));
 }
 
+EthercatDeviceFinder::~EthercatDeviceFinder() {
+    if (scan_future_.valid()) scan_future_.wait();
+}
+
 void EthercatDeviceFinder::tick() {
     std::scoped_lock lock(mutex_);
     if (!enabled_ || api_ == nullptr) return;
@@ -389,8 +393,11 @@ void EthercatDeviceFinder::startScanLocked() {
         const auto allowed = adapter_ids_;
         const auto receive_timeout_us = receive_timeout_us_;
         scan_future_ = std::async(std::launch::async,
-            [excluded = std::move(excluded), allowed, receive_timeout_us]() {
-                return scanEthercatBuses(excluded, allowed, receive_timeout_us);
+            [&bridge = discovery_bridge_, excluded = std::move(excluded), allowed, receive_timeout_us]() {
+                // Only one scan runs at a time. Reuse the bridge across scans
+                // so idle periods don't cycle the native runtime through unload and load.
+                if (!bridge) bridge = std::make_unique<BridgeLibrary>();
+                return scanEthercatBuses(*bridge, excluded, allowed, receive_timeout_us);
             });
     } catch (const std::exception& error) {
         scan_in_progress_ = false;
