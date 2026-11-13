@@ -1,5 +1,7 @@
 import React from './react.ts';
 import {ConfigMap} from './config-maps/index.ts';
+import {defineSchematicNodePreset} from './schematic-nodes/index.ts';
+import type {SchematicNodePresetDefinition} from './schematic-nodes/types.ts';
 import type {
     InterfaceContributionEntry,
     InterfaceContributions,
@@ -27,6 +29,7 @@ const EMPTY_CONTRIBUTIONS = (): InterfaceContributions => ({
     moduleUis: [],
     resources: [],
     schematicNodes: [],
+    schematicNodePresets: [],
     settingsPanels: [],
     popupUis: [],
 });
@@ -57,6 +60,7 @@ function materializePlugin(definition: InterfacePluginDefinition): MaterializedI
     const moduleUis: MaterializedInterfacePlugin["moduleUis"] = {};
     const resources: MaterializedInterfacePlugin["resources"] = [];
     const schematicNodes: MaterializedInterfacePlugin["schematicNodes"] = [];
+    const schematicNodePresets: SchematicNodePresetDefinition[] = [];
     const settingsPanels: MaterializedInterfacePlugin["settingsPanels"] = [];
     const popupUis: MaterializedInterfacePlugin["popupUis"] = {};
     const valueFormats: MaterializedInterfacePlugin["valueFormats"] = {};
@@ -82,7 +86,7 @@ function materializePlugin(definition: InterfacePluginDefinition): MaterializedI
             name: String(nameValue ?? "").trim() || localId,
             ...details,
         };
-        contributions[category].push(entry);
+        (contributions[category] ??= []).push(entry);
         return canonicalId;
     }
 
@@ -142,6 +146,12 @@ function materializePlugin(definition: InterfacePluginDefinition): MaterializedI
             schematicNodes.push({...value, type: id});
             return id;
         },
+        addSchematicNodePreset(value: SchematicNodePresetDefinition) {
+            defineSchematicNodePreset(value);
+            const id = addEntry("schematicNodePresets", value.id, value.name);
+            schematicNodePresets.push({...value, id});
+            return id;
+        },
         addSettingsPanel(value: SettingsPanelDefinition) {
             const id = addEntry("settingsPanels", value.id, value.name);
             const component = value.component ?? (value.configMap ? (props: any) => (React as any).createElement(ConfigMap, {
@@ -177,6 +187,7 @@ function materializePlugin(definition: InterfacePluginDefinition): MaterializedI
         moduleUis,
         resources,
         schematicNodes,
+        schematicNodePresets,
         settingsPanels,
         popupUis,
         valueFormats,

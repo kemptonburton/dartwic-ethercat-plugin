@@ -60,6 +60,8 @@ Build output is `ui/index.js`. The live registry supplies installed-plugin contr
 
 Schematic node renderers and configuration UI are Interface-owned. Register plugin node contributions through the schematic-node APIs and bundle supporting files inside the plugin's `assets/`. User-authored shared palette JSON belongs in workspace `assets/schematic_nodes/`; plugin installation never writes into that authored directory.
 
+`schematic-nodes` exports `BaseNode`, `BaseNodeConfig`, `GeneralNode`, `GeneralNodeConfig`, shared config fields and readout/source controls. Register a custom renderer with `addSchematicNode`, or a data-only General Node variant with `addSchematicNodePreset`. Both populate the browser and gallery; declared channel bindings also support Insert Node and existing-node drops. See [Schematic Nodes](../../docs/Website/docs/Plugins/Schematic%20Nodes.md) for complete examples, handle roles, mixed-selection editing and compatibility.
+
 Public entrypoints include the main registry types, `assets`, `storage`, `tasks`, `resources`, `plugin-settings`, `module-configs`, `schematic-nodes`, `hooks`, `ui`, `utils`, `runtime`, `react`, and the Tailwind preset.
 
 `createStorageClient(operation)` from `@dartwic/interface-sdk/storage` provides

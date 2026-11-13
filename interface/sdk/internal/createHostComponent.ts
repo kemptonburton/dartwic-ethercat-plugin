@@ -15,6 +15,7 @@ export function createHostComponent<Props extends Record<string, unknown>>(
     const component = {
         $$typeof: Symbol.for("react.forward_ref"),
         displayName,
+        [Symbol.for("dartwic.interface.host-component")]: displayName,
         render(props: Props, ref: unknown) {
             const Component = resolver(getHostApi());
             if (!Component) throw new Error(`The interface host does not provide ${displayName}. Check minInterfaceVersion.`);

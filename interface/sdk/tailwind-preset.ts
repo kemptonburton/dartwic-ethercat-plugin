@@ -102,6 +102,9 @@ export const dartwicTailwindPreset = {
                     edge: "var(--schematic-edge)",
                     "label-color": "var(--schematic-label-color)",
                     "node-accent": "var(--schematic-node-accent)",
+                    "node-background-1": "var(--schematic-node-background-1)",
+                    "node-background-2": "var(--schematic-node-background-2)",
+                    "node-accent-1": "var(--schematic-node-accent-1)",
                 },
                 editor: {
                     background: "var(--editor-background)",

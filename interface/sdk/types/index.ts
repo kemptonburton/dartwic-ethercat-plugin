@@ -2,7 +2,7 @@ import type {ConfigMapDefinition} from "../config-maps/index.ts";
 import type { ModuleConfigDefinition } from "../module-configs/types.ts";
 import type { PluginSettingsDefinition } from "../plugin-settings/types.ts";
 import type { ResourceDefinition } from "../resources/types.ts";
-import type { SchematicNodeDefinition } from "../schematic-nodes/types.ts";
+import type {SchematicNodeDefinition, SchematicNodePresetDefinition} from "../schematic-nodes/types.ts";
 import type { TaskCardDefinition, TaskConfigDefinition } from "../tasks/types.ts";
 
 /** Shared local identity and display name for plugin contributions. @dartwic-reference @category Plugin Registration */
@@ -87,6 +87,8 @@ export interface InterfacePluginRegistrar {
     addModuleUi(definition: ModuleUiDefinition): string;
     addResource(definition: ResourceContributionDefinition): string;
     addSchematicNode(definition: SchematicNodeContributionDefinition): string;
+    /** Add a data-only preset to the node browser, Insert Node and gallery. Returns its plugin-qualified id. */
+    addSchematicNodePreset(definition: SchematicNodePresetDefinition): string;
     addSettingsPanel(definition: SettingsPanelDefinition): string;
     addPopupUi(definition: PopupUiDefinition): string;
 }
@@ -110,6 +112,7 @@ export interface InterfaceContributions {
     moduleUis: InterfaceContributionEntry[];
     resources: InterfaceContributionEntry[];
     schematicNodes: InterfaceContributionEntry[];
+    schematicNodePresets?: InterfaceContributionEntry[];
     settingsPanels: InterfaceContributionEntry[];
     popupUis: InterfaceContributionEntry[];
 }
@@ -125,6 +128,7 @@ export interface MaterializedInterfacePlugin {
     moduleUis: Record<string, ModuleUiDefinition>;
     resources: ResourceDefinition[];
     schematicNodes: SchematicNodeDefinition[];
+    schematicNodePresets?: SchematicNodePresetDefinition[];
     settingsPanels: SettingsPanelDefinition[];
     popupUis: Record<string, PopupUiDefinition>;
     contributions: {interface: InterfaceContributions};

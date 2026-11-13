@@ -76,7 +76,9 @@ export const getChannelValueFromChannels = (channels: Record<string, unknown>, v
 export const ifElseBlockCheck = (data: Record<string, unknown>, channels: Record<string, unknown>) => callHelper("ifElseBlockCheck", [data, channels]);
 /** Create a control-display schematic node definition from channel data. @dartwic-reference @category DARTWIC UI Components */
 export const buildControlDisplayNodeDefinitionFromChannel = (channel: unknown, options?: Record<string, unknown>) => callHelper("buildControlDisplayNodeDefinitionFromChannel", [channel, options]);
-/** Create a parameter-display schematic node definition from channel data. @dartwic-reference @category DARTWIC UI Components */
+/** Create a readout schematic node definition from channel data. @dartwic-reference @category DARTWIC UI Components */
+export const buildReadoutNodeDefinitionFromChannel = (channel: unknown, options?: Record<string, unknown>) => callHelper("buildReadoutNodeDefinitionFromChannel", [channel, options]);
+/** Legacy alias for buildReadoutNodeDefinitionFromChannel. @dartwic-reference @category DARTWIC UI Components */
 export const buildParameterDisplayNodeDefinitionFromChannel = (channel: unknown, options?: Record<string, unknown>) => callHelper("buildParameterDisplayNodeDefinitionFromChannel", [channel, options]);
 /** Normalize a legacy channel and field reference using host rules. @dartwic-reference @category DARTWIC UI Components */
 export const normalizeLegacyChannelFieldReference = (value: string, field?: string | null) => callHelper("normalizeLegacyChannelFieldReference", [value, field]);
