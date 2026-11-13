@@ -3,7 +3,7 @@
   "name": "EtherCAT",
   "description": "High-speed cyclic EtherCAT I/O for DARTWIC using a KickCAT C bridge.",
   "author": "Kempton Burton",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "minEngineVersion": "2.1.0",
   "minInterfaceVersion": "2.1.0",
   "contains_engine_plugin": true,
